@@ -1,0 +1,25 @@
+# MongoDB配置
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "datacenter"
+
+# JWT配置
+jwt:
+  secret: "your-secret-key"
+  expiration: 24h
+  refresh_expiration: 720h
+
+# 日志配置
+logger:
+  level: "info"
+  file_path: "logs/app.log"
+  max_size: 100
+  max_backups: 5
+  max_age: 30
+
+# 服务器配置
+server:
+  port: 8080
+  host: "0.0.0.0"
+  read_timeout: 10s
+  write_timeout: 10s
