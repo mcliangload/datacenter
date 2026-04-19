@@ -1,3 +1,5 @@
 export { default as apiClient } from './api'
 export { default as authService } from './auth'
-export { default as queryService } from './query'
+export { default as userService } from './user'
+export { roleService, permissionService } from './rbac'
+export { default as scraperService } from './scraper'

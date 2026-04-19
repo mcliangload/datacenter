@@ -84,6 +84,7 @@ type Role struct {
 type ScrapeTaskStatus string
 
 const (
+	ScrapeTaskStatusPending  ScrapeTaskStatus = "pending"
 	ScrapeTaskStatusScraping ScrapeTaskStatus = "scraping"
 	ScrapeTaskStatusSuccess  ScrapeTaskStatus = "success"
 	ScrapeTaskStatusFailed   ScrapeTaskStatus = "failed"
@@ -91,20 +92,36 @@ const (
 
 type ScrapeTask struct {
 	BaseModel
-	Module        string           `json:"module" bson:"module"`
-	DataPath      string           `json:"data_path" bson:"data_path"`
-	ScraperPath   string           `json:"scraper_path" bson:"scraper_path"`
-	Status        ScrapeTaskStatus `json:"status" bson:"status"`
-	Result        interface{}      `json:"result" bson:"result"`
-	ErrorMessage  string           `json:"error_message" bson:"error_message"`
-	StartedAt     *time.Time       `json:"started_at" bson:"started_at"`
-	CompletedAt   *time.Time       `json:"completed_at" bson:"completed_at"`
+	Module         string             `json:"module" bson:"module"`
+	DataPath       string             `json:"data_path" bson:"data_path"`
+	ScraperPath    string             `json:"scraper_path" bson:"scraper_path"`
+	Status         ScrapeTaskStatus   `json:"status" bson:"status"`
+	Result         interface{}        `json:"result" bson:"result"`
+	ErrorMessage   string             `json:"error_message" bson:"error_message"`
+	StartedAt      *time.Time         `json:"started_at" bson:"started_at"`
+	CompletedAt    *time.Time         `json:"completed_at" bson:"completed_at"`
+	BusinessDataID primitive.ObjectID `json:"business_data_id,omitempty" bson:"business_data_id,omitempty"`
+}
+
+type DeletedScrapeTask struct {
+	BaseModel
+	Module         string             `json:"module" bson:"module"`
+	OriginalID     primitive.ObjectID `json:"original_id" bson:"original_id"`
+	DataPath       string             `json:"data_path" bson:"data_path"`
+	ScraperPath    string             `json:"scraper_path" bson:"scraper_path"`
+	Status         ScrapeTaskStatus   `json:"status" bson:"status"`
+	Result         interface{}        `json:"result" bson:"result"`
+	ErrorMessage   string             `json:"error_message" bson:"error_message"`
+	StartedAt      *time.Time         `json:"started_at" bson:"started_at"`
+	CompletedAt    *time.Time         `json:"completed_at" bson:"completed_at"`
+	BusinessDataID primitive.ObjectID `json:"business_data_id,omitempty" bson:"business_data_id,omitempty"`
+	DeletedAt      time.Time          `json:"deleted_at" bson:"deleted_at"`
 }
 
 type Collection struct {
 	BaseModel
-	Module          string `json:"module" bson:"module"`
-	Description     string `json:"description" bson:"description"`
-	DatatypeOwner   string `json:"datatype_owner" bson:"datatype_owner"`
-	CollectionName  string `json:"collection_name" bson:"collection_name"`
+	Module         string `json:"module" bson:"module"`
+	Description    string `json:"description" bson:"description"`
+	DatatypeOwner  string `json:"datatype_owner" bson:"datatype_owner"`
+	CollectionName string `json:"collection_name" bson:"collection_name"`
 }

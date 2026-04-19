@@ -2,7 +2,8 @@ import { Button, Card, Form, Input, message } from 'antd'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import authService from '../../services/auth'
+import authService, { AuthResponse } from '../../services/auth'
+import type { User } from '../../types'
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -12,12 +13,18 @@ const LoginPage: React.FC = () => {
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true)
     try {
-      const response = await authService.login(values)
-      login(response.token, response.user)
+      const response: AuthResponse = await authService.login(values)
+      const user: User = {
+        id: response.user.id,
+        username: response.user.username,
+        email: response.user.email,
+        role_ids: response.user.roles || []
+      }
+      login(response.token, user)
       message.success('登录成功')
-      navigate('/search')
-    } catch (error) {
-      message.error('登录失败，请检查用户名和密码')
+      navigate('/admin')
+    } catch (error: any) {
+      message.error(error?.response?.data?.error || '登录失败，请检查用户名和密码')
     } finally {
       setLoading(false)
     }

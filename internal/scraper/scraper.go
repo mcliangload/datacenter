@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"datacenter/internal/storage"
 
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Scraper 刮削系统接口
@@ -79,18 +81,8 @@ func (s *scraper) SubmitTask(task *models.ScrapeTask) error {
 	// 检查模块是否存在
 	_, err := s.storage.GetCollectionByModule(task.Module)
 	if err != nil {
-		// 如果模块不存在，创建默认集合
-		collection := &models.Collection{
-			Module:         task.Module,
-			Description:    fmt.Sprintf("%s模块数据", task.Module),
-			DatatypeOwner:  task.CreatedBy,
-			CollectionName: task.Module + "_data",
-		}
-		err = s.storage.CreateCollection(collection)
-		if err != nil {
-			return fmt.Errorf("创建模块集合失败: %v", err)
-		}
-		log.Info().Str("module", task.Module).Msg("自动创建模块集合")
+		// 如果模块不存在，返回错误
+		return fmt.Errorf("模块不存在: %s，请先创建模块集合", task.Module)
 	}
 
 	// 保存任务到数据库
@@ -172,25 +164,31 @@ func (s *scraper) processTask(task *models.ScrapeTask, workerID int) {
 	task.Result = result
 	completedNow := time.Now()
 	task.CompletedAt = &completedNow
-	err = s.storage.UpdateScrapeTask(task)
-	if err != nil {
-		log.Error().Str("task_id", task.ID.Hex()).Err(err).Msg("更新任务成功状态失败")
-		return
-	}
 
 	// 存储刮削结果到业务数据
-	err = s.saveScrapedData(task, result)
+	dataID, err := s.saveScrapedData(task, result)
 	if err != nil {
 		log.Error().
 			Int("worker_id", workerID).
 			Str("task_id", task.ID.Hex()).
 			Err(err).
 			Msg("存储刮削结果失败")
+		// 即使存储失败，也更新任务状态
+	} else {
+		// 更新任务记录，关联业务数据ID
+		task.BusinessDataID = dataID
+	}
+
+	err = s.storage.UpdateScrapeTask(task)
+	if err != nil {
+		log.Error().Str("task_id", task.ID.Hex()).Err(err).Msg("更新任务成功状态失败")
+		return
 	}
 
 	log.Info().
 		Int("worker_id", workerID).
 		Str("task_id", task.ID.Hex()).
+		Str("business_data_id", dataID.Hex()).
 		Msg("刮削任务处理完成")
 }
 
@@ -232,31 +230,47 @@ func (s *scraper) executeScraper(scraperPath, dataPath string) (map[string]inter
 	return result.Data, nil
 }
 
-// saveScrapedData 存储刮削结果
-func (s *scraper) saveScrapedData(task *models.ScrapeTask, data map[string]interface{}) error {
+// saveScrapedData 存储刮削结果，返回业务数据ID
+func (s *scraper) saveScrapedData(task *models.ScrapeTask, data map[string]interface{}) (primitive.ObjectID, error) {
+	// 增强数据结构，添加路径信息
+	enhancedData := make(map[string]interface{})
+	for k, v := range data {
+		enhancedData[k] = v
+	}
+
+	// 添加路径信息
+	enhancedData["scrape_path"] = task.ScraperPath
+	enhancedData["data_path"] = task.DataPath
+	enhancedData["module"] = task.Module
+	enhancedData["task_id"] = task.ID.Hex()
+	enhancedData["scraped_at"] = time.Now()
+
 	// 创建业务数据
 	businessData := &models.BusinessData{
 		Module:       task.Module,
 		Description:  fmt.Sprintf("刮削数据 - %s", task.DataPath),
-		CustomFields: data,
+		CustomFields: enhancedData,
 		FilePath:     task.DataPath,
 		BaseModel: models.BaseModel{
 			CreatedBy: task.CreatedBy,
 			UpdatedBy: task.CreatedBy,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		},
 	}
 
 	// 保存到动态集合
-	err := s.storage.CreateBusinessData(businessData)
+	err := s.storage.CreateBusinessData(context.Background(), businessData)
 	if err != nil {
-		return fmt.Errorf("存储业务数据失败: %v", err)
+		return primitive.NilObjectID, fmt.Errorf("存储业务数据失败: %v", err)
 	}
 
 	log.Info().
 		Str("task_id", task.ID.Hex()).
 		Str("module", task.Module).
 		Str("data_id", businessData.ID.Hex()).
-		Msg("刮削结果已存储")
+		Str("collection", task.Module+"_data").
+		Msg("刮削结果已存储到对应模块集合")
 
-	return nil
+	return businessData.ID, nil
 }

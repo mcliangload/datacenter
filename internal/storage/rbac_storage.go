@@ -19,11 +19,13 @@ type RBACStorage interface {
 	UpdateUser(user *models.User) error
 	DeleteUser(id string) error
 	GetUsers(skip, limit int64) ([]models.User, error)
+	GetUsersCount() (int64, error)
 
 	CreatePermission(permission *models.Permission) error
 	GetPermissionByID(id string) (*models.Permission, error)
 	GetPermissionByCode(code string) (*models.Permission, error)
 	GetPermissions(skip, limit int64) ([]models.Permission, error)
+	GetPermissionsCount() (int64, error)
 	UpdatePermission(permission *models.Permission) error
 	DeletePermission(id string) error
 
@@ -31,6 +33,7 @@ type RBACStorage interface {
 	GetRoleByID(id string) (*models.Role, error)
 	GetRoleByCode(code string) (*models.Role, error)
 	GetRoles(skip, limit int64) ([]models.Role, error)
+	GetRolesCount() (int64, error)
 	UpdateRole(role *models.Role) error
 	DeleteRole(id string) error
 
@@ -160,6 +163,10 @@ func (s *rbacMongoDBStorage) GetUsers(skip, limit int64) ([]models.User, error) 
 	return users, nil
 }
 
+func (s *rbacMongoDBStorage) GetUsersCount() (int64, error) {
+	return s.users.CountDocuments(context.Background(), bson.M{})
+}
+
 func (s *rbacMongoDBStorage) CreatePermission(permission *models.Permission) error {
 	permission.ID = primitive.NewObjectID()
 	permission.CreatedAt = time.Now()
@@ -207,6 +214,10 @@ func (s *rbacMongoDBStorage) GetPermissions(skip, limit int64) ([]models.Permiss
 	}
 
 	return permissions, nil
+}
+
+func (s *rbacMongoDBStorage) GetPermissionsCount() (int64, error) {
+	return s.permissions.CountDocuments(context.Background(), bson.M{})
 }
 
 func (s *rbacMongoDBStorage) UpdatePermission(permission *models.Permission) error {
@@ -275,6 +286,10 @@ func (s *rbacMongoDBStorage) GetRoles(skip, limit int64) ([]models.Role, error) 
 	}
 
 	return roles, nil
+}
+
+func (s *rbacMongoDBStorage) GetRolesCount() (int64, error) {
+	return s.roles.CountDocuments(context.Background(), bson.M{})
 }
 
 func (s *rbacMongoDBStorage) UpdateRole(role *models.Role) error {

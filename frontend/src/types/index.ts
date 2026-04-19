@@ -2,6 +2,38 @@ export interface User {
   id: string
   username: string
   email: string
+  phone?: string
+  address?: string
+  avatar?: string
+  role_ids?: string[]
+  created_by?: string
+  updated_by?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Role {
+  id: string
+  name: string
+  code: string
+  description: string
+  permission_ids: string[]
+  created_by?: string
+  updated_by?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Permission {
+  id: string
+  name: string
+  code: string
+  description: string
+  module?: string
+  created_by?: string
+  updated_by?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface LoginRequest {
@@ -14,26 +46,51 @@ export interface LoginResponse {
   user: User
 }
 
-export interface SearchRequest {
-  jql: string
+export interface CreateDataRequest {
+  module: string
+  description: string
+  custom_fields?: Record<string, any>
 }
 
-export interface SearchResponse {
-  issues: Array<{
-    id: string
-    key: string
-    summary: string
-    status: string
-    assignee?: User
-    reporter?: User
-  }>
+export interface CreateUserRequest {
+  username: string
+  email: string
+  password: string
+  phone?: string
+  address?: string
+  role_ids?: string[]
+}
+
+export interface UpdateUserRequest {
+  email?: string
+  password?: string
+  phone?: string
+  address?: string
+  role_ids?: string[]
+}
+
+export interface CreateRoleRequest {
+  name: string
+  code: string
+  description: string
+  permission_ids?: string[]
+}
+
+export interface UpdateRoleRequest {
+  name?: string
+  code?: string
+  description?: string
+  permission_ids?: string[]
+}
+
+export interface ApiResponse {
+  message?: string
+  error?: string
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
   total: number
   page: number
   pageSize: number
-}
-
-export interface SearchParams {
-  keyword: string
-  page?: number
-  pageSize?: number
 }

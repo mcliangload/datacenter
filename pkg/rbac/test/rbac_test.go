@@ -61,6 +61,7 @@ func (m *mockStorage) GetUserByUsername(username string) (*models.User, error) {
 func (m *mockStorage) UpdateUser(user *models.User) error                      { return nil }
 func (m *mockStorage) DeleteUser(id string) error                              { return nil }
 func (m *mockStorage) GetUsers(skip, limit int64) ([]models.User, error)       { return nil, nil }
+func (m *mockStorage) GetUsersCount() (int64, error)                           { return 0, nil }
 
 func (m *mockStorage) CreateFieldDefinition(field *models.FieldDefinition) error { return nil }
 func (m *mockStorage) GetFieldDefinitionByID(id string) (*models.FieldDefinition, error) {
@@ -104,6 +105,7 @@ func (m *mockStorage) GetPermissionByCode(code string) (*models.Permission, erro
 	return perm, nil
 }
 func (m *mockStorage) GetPermissions(skip, limit int64) ([]models.Permission, error) { return nil, nil }
+func (m *mockStorage) GetPermissionsCount() (int64, error)                        { return int64(len(m.permissions)), nil }
 func (m *mockStorage) UpdatePermission(permission *models.Permission) error          { return nil }
 func (m *mockStorage) DeletePermission(id string) error                              { return nil }
 
@@ -124,6 +126,7 @@ func (m *mockStorage) GetRoleByCode(code string) (*models.Role, error) {
 	return role, nil
 }
 func (m *mockStorage) GetRoles(skip, limit int64) ([]models.Role, error) { return nil, nil }
+func (m *mockStorage) GetRolesCount() (int64, error)                         { return int64(len(m.roles)), nil }
 func (m *mockStorage) UpdateRole(role *models.Role) error                { return nil }
 func (m *mockStorage) DeleteRole(id string) error                        { return nil }
 

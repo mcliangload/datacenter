@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"datacenter/internal/auth"
 	"datacenter/internal/models"
@@ -12,7 +15,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -20,34 +22,30 @@ type Handler struct {
 	storage     storage.Storage
 	rbacStorage storage.RBACStorage
 	scraper     scraper.Scraper
+	jwtService  auth.JWTService
 }
 
-func NewHandler(businessStorage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper) *Handler {
+func NewHandler(storage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper, jwtService auth.JWTService) *Handler {
 	return &Handler{
-		storage:     businessStorage,
+		storage:     storage,
 		rbacStorage: rbacStorage,
 		scraper:     scraper,
+		jwtService:  jwtService,
 	}
 }
 
-func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService) {
-	public := router.Group("/api")
-	{
-		public.Use(func(c *gin.Context) {
-			c.Set("jwtService", jwtService)
-			c.Next()
-		})
-		public.POST("/auth/login", h.Login)
-	}
+func (h *Handler) RegisterRoutes(r *gin.Engine) {
+	r.POST("/api/auth/login", h.Login)
+	r.POST("/api/auth/register", h.Register)
 
-	protected := router.Group("/api")
-	protected.Use(auth.AuthMiddleware(jwtService))
+	protected := r.Group("/api")
+	protected.Use(h.AuthMiddleware())
 	{
 		users := protected.Group("/users")
 		{
-			users.POST("", h.CreateUser)
 			users.GET("", h.GetUsers)
 			users.GET("/:id", h.GetUserByID)
+			users.POST("", h.CreateUser)
 			users.PUT("/:id", h.UpdateUser)
 			users.DELETE("/:id", h.DeleteUser)
 			users.POST("/:id/roles", h.AssignRoleToUser)
@@ -57,18 +55,18 @@ func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService)
 
 		permissions := protected.Group("/permissions")
 		{
-			permissions.POST("", h.CreatePermission)
 			permissions.GET("", h.GetPermissions)
 			permissions.GET("/:id", h.GetPermissionByID)
+			permissions.POST("", h.CreatePermission)
 			permissions.PUT("/:id", h.UpdatePermission)
 			permissions.DELETE("/:id", h.DeletePermission)
 		}
 
 		roles := protected.Group("/roles")
 		{
-			roles.POST("", h.CreateRole)
 			roles.GET("", h.GetRoles)
 			roles.GET("/:id", h.GetRoleByID)
+			roles.POST("", h.CreateRole)
 			roles.PUT("/:id", h.UpdateRole)
 			roles.DELETE("/:id", h.DeleteRole)
 			roles.POST("/:id/permissions", h.AssignPermissionToRole)
@@ -78,9 +76,9 @@ func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService)
 
 		fields := protected.Group("/fields")
 		{
-			fields.POST("", h.CreateFieldDefinition)
 			fields.GET("/module/:module", h.GetFieldDefinitionsByModule)
 			fields.GET("/:id", h.GetFieldDefinitionByID)
+			fields.POST("", h.CreateFieldDefinition)
 			fields.PUT("/:id", h.UpdateFieldDefinition)
 			fields.DELETE("/:id", h.DeleteFieldDefinition)
 		}
@@ -89,9 +87,9 @@ func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService)
 		{
 			business.POST("", h.CreateBusinessData)
 			business.GET("/module/:module", h.GetBusinessDataByModule)
-			business.GET("/:id", h.GetBusinessDataByID)
-			business.PUT("/:id", h.UpdateBusinessData)
-			business.DELETE("/:id", h.DeleteBusinessData)
+			business.GET("/module/:module/:id", h.GetBusinessDataByID)
+			business.PUT("/module/:module/:id", h.UpdateBusinessData)
+			business.DELETE("/module/:module/:id", h.DeleteBusinessData)
 		}
 
 		deleted := protected.Group("/deleted")
@@ -101,20 +99,27 @@ func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService)
 			deleted.POST("/:id/recover", h.RecoverDeletedData)
 		}
 
-		scraper := protected.Group("/scraper")
+		scraperGroup := protected.Group("/scraper")
 		{
-			scraper.POST("/upload", h.UploadScrapeTask)
-			scraper.GET("/tasks", h.GetScrapeTasks)
-			scraper.GET("/tasks/:id", h.GetScrapeTaskByID)
-			scraper.POST("/tasks/:id/retry", h.RetryScrapeTask)
-			scraper.DELETE("/tasks/:id", h.DeleteScrapeTask)
+			scraperGroup.POST("/upload", h.SubmitScrapeTask)
+			scraperGroup.GET("/tasks", h.GetScrapeTasks)
+			scraperGroup.GET("/tasks/:id", h.GetScrapeTaskByID)
+			scraperGroup.POST("/tasks/:id/retry", h.RetryScrapeTask)
+			scraperGroup.DELETE("/tasks/:id", h.DeleteScrapeTask)
+		}
+
+		deletedScraper := protected.Group("/deleted-scraper")
+		{
+			deletedScraper.GET("/module/:module", h.GetDeletedScrapeTasksByModule)
+			deletedScraper.GET("/:id", h.GetDeletedScrapeTaskByID)
+			deletedScraper.POST("/:id/recover", h.RecoverScrapeTask)
 		}
 
 		collections := protected.Group("/collections")
 		{
-			collections.POST("", h.CreateCollection)
 			collections.GET("", h.GetCollections)
 			collections.GET("/:module", h.GetCollectionByModule)
+			collections.POST("", h.CreateCollection)
 			collections.PUT("/:module", h.UpdateCollection)
 			collections.DELETE("/:module", h.DeleteCollection)
 			collections.POST("/:module/indexes", h.CreateCollectionIndex)
@@ -125,35 +130,28 @@ func (h *Handler) RegisterRoutes(router *gin.Engine, jwtService auth.JWTService)
 }
 
 func (h *Handler) Login(c *gin.Context) {
-	var loginReq struct {
+	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&loginReq); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user, err := h.rbacStorage.GetUserByUsername(loginReq.Username)
+	user, err := h.rbacStorage.GetUserByUsername(req.Username)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	if err := auth.CheckPassword(loginReq.Password, user.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+	if err := auth.CheckPassword(req.Password, user.Password); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	roles, _ := h.rbacStorage.GetUserRoles(user.ID.Hex())
-	roleCodes := make([]string, len(roles))
-	for i, role := range roles {
-		roleCodes[i] = role.Code
-	}
-
-	jwtService := c.MustGet("jwtService").(auth.JWTService)
-	token, err := jwtService.GenerateToken(user.ID.Hex(), roleCodes, nil)
+	token, err := h.jwtService.GenerateToken(user.ID.Hex(), user.RoleIDs, []string{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -162,55 +160,93 @@ func (h *Handler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user": gin.H{
-			"id":       user.ID.Hex(),
+			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
-			"roles":    roleCodes,
+			"roles":    user.RoleIDs,
 		},
 	})
 }
 
-func (h *Handler) CreateUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+func (h *Handler) Register(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Email    string `json:"email" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	hashedPassword, err := auth.HashPassword(user.Password)
+	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 		return
 	}
-	user.Password = hashedPassword
 
-	userID := c.GetString("userID")
-	user.CreatedBy = userID
-	user.UpdatedBy = userID
+	user := &models.User{
+		Username: req.Username,
+		Password: hashedPassword,
+		Email:    req.Email,
+		RoleIDs:  []string{},
+	}
 
-	if err := h.rbacStorage.CreateUser(&user); err != nil {
+	if err := h.rbacStorage.CreateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	for _, roleCode := range user.RoleIDs {
-		role, err := h.rbacStorage.GetRoleByCode(roleCode)
-		if err != nil {
-			continue
+	c.JSON(http.StatusCreated, gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"email":    user.Email,
+	})
+}
+
+func (h *Handler) AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.Abort()
+			return
 		}
-		h.rbacStorage.AssignRoleToUser(user.ID.Hex(), role.ID.Hex(), userID)
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
+			c.Abort()
+			return
+		}
+
+		claims, err := h.jwtService.ValidateToken(tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", claims.UserID)
+		c.Set("roles", claims.Roles)
+
+		c.Next()
 	}
-
-	user.Password = ""
-
-	c.JSON(http.StatusCreated, user)
 }
 
 func (h *Handler) GetUsers(c *gin.Context) {
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	users, err := h.rbacStorage.GetUsers(skip, limit)
+	users, err := h.rbacStorage.GetUsers(skip, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	total, err := h.rbacStorage.GetUsersCount()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -220,7 +256,12 @@ func (h *Handler) GetUsers(c *gin.Context) {
 		users[i].Password = ""
 	}
 
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, gin.H{
+		"data":     users,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetUserByID(c *gin.Context) {
@@ -230,52 +271,86 @@ func (h *Handler) GetUserByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
-
-	roles, _ := h.rbacStorage.GetUserRoles(id)
-	roleCodes := make([]string, len(roles))
-	for i, role := range roles {
-		roleCodes[i] = role.Code
-	}
-	user.RoleIDs = roleCodes
-
 	user.Password = ""
-
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *Handler) UpdateUser(c *gin.Context) {
-	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
+func (h *Handler) CreateUser(c *gin.Context) {
+	var req struct {
+		Username string   `json:"username" binding:"required"`
+		Password string   `json:"password" binding:"required"`
+		Email    string   `json:"email" binding:"required"`
+		RoleIDs  []string `json:"role_ids"`
 	}
 
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if user.Password != "" {
-		hashedPassword, err := auth.HashPassword(user.Password)
+	hashedPassword, err := auth.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	user := &models.User{
+		Username: req.Username,
+		Password: hashedPassword,
+		Email:    req.Email,
+		RoleIDs:  req.RoleIDs,
+	}
+
+	if err := h.rbacStorage.CreateUser(user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	user.Password = ""
+	c.JSON(http.StatusCreated, user)
+}
+
+func (h *Handler) UpdateUser(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Email    string   `json:"email"`
+		Password string   `json:"password"`
+		RoleIDs  []string `json:"role_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.rbacStorage.GetUserByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if req.Email != "" {
+		user.Email = req.Email
+	}
+	if req.Password != "" {
+		hashedPassword, err := auth.HashPassword(req.Password)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 			return
 		}
 		user.Password = hashedPassword
 	}
+	if req.RoleIDs != nil {
+		user.RoleIDs = req.RoleIDs
+	}
 
-	user.ID = objectID
-	user.UpdatedBy = c.GetString("userID")
-
-	if err := h.rbacStorage.UpdateUser(&user); err != nil {
+	if err := h.rbacStorage.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	user.Password = ""
-
 	c.JSON(http.StatusOK, user)
 }
 
@@ -285,7 +360,6 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
@@ -300,69 +374,97 @@ func (h *Handler) AssignRoleToUser(c *gin.Context) {
 		return
 	}
 
-	operatorID := c.GetString("userID")
-	if err := h.rbacStorage.AssignRoleToUser(userID, req.RoleID, operatorID); err != nil {
+	user, err := h.rbacStorage.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	for _, roleID := range user.RoleIDs {
+		if roleID == req.RoleID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Role already assigned"})
+			return
+		}
+	}
+
+	user.RoleIDs = append(user.RoleIDs, req.RoleID)
+	if err := h.rbacStorage.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Role assigned successfully"})
+	c.JSON(http.StatusOK, user)
 }
 
 func (h *Handler) RemoveRoleFromUser(c *gin.Context) {
 	userID := c.Param("id")
 	roleID := c.Param("roleId")
 
-	if err := h.rbacStorage.RemoveRoleFromUser(userID, roleID); err != nil {
+	user, err := h.rbacStorage.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	newRoleIDs := []string{}
+	for _, id := range user.RoleIDs {
+		if id != roleID {
+			newRoleIDs = append(newRoleIDs, id)
+		}
+	}
+
+	user.RoleIDs = newRoleIDs
+	if err := h.rbacStorage.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Role removed successfully"})
+	c.JSON(http.StatusOK, user)
 }
 
 func (h *Handler) GetUserRoles(c *gin.Context) {
 	userID := c.Param("id")
 
-	roles, err := h.rbacStorage.GetUserRoles(userID)
+	user, err := h.rbacStorage.GetUserByID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
+	}
+
+	roles := []models.Role{}
+	for _, roleID := range user.RoleIDs {
+		role, err := h.rbacStorage.GetRoleByID(roleID)
+		if err == nil {
+			roles = append(roles, *role)
+		}
 	}
 
 	c.JSON(http.StatusOK, roles)
 }
 
-func (h *Handler) CreatePermission(c *gin.Context) {
-	var permission models.Permission
-	if err := c.ShouldBindJSON(&permission); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	userID := c.GetString("userID")
-	permission.CreatedBy = userID
-	permission.UpdatedBy = userID
-
-	if err := h.rbacStorage.CreatePermission(&permission); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, permission)
-}
-
 func (h *Handler) GetPermissions(c *gin.Context) {
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	permissions, err := h.rbacStorage.GetPermissions(skip, limit)
+	permissions, err := h.rbacStorage.GetPermissions(skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, permissions)
+	total, err := h.rbacStorage.GetPermissionsCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     permissions,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetPermissionByID(c *gin.Context) {
@@ -372,28 +474,62 @@ func (h *Handler) GetPermissionByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Permission not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, permission)
 }
 
-func (h *Handler) UpdatePermission(c *gin.Context) {
-	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid permission ID"})
-		return
+func (h *Handler) CreatePermission(c *gin.Context) {
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		Code        string `json:"code" binding:"required"`
+		Description string `json:"description"`
 	}
 
-	var permission models.Permission
-	if err := c.ShouldBindJSON(&permission); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	permission.ID = objectID
-	permission.UpdatedBy = c.GetString("userID")
+	permission := &models.Permission{
+		Name:        req.Name,
+		Code:        req.Code,
+		Description: req.Description,
+	}
 
-	if err := h.rbacStorage.UpdatePermission(&permission); err != nil {
+	if err := h.rbacStorage.CreatePermission(permission); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, permission)
+}
+
+func (h *Handler) UpdatePermission(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	permission, err := h.rbacStorage.GetPermissionByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Permission not found"})
+		return
+	}
+
+	if req.Name != "" {
+		permission.Name = req.Name
+	}
+	if req.Description != "" {
+		permission.Description = req.Description
+	}
+
+	if err := h.rbacStorage.UpdatePermission(permission); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -407,40 +543,32 @@ func (h *Handler) DeletePermission(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Permission deleted successfully"})
 }
 
-func (h *Handler) CreateRole(c *gin.Context) {
-	var role models.Role
-	if err := c.ShouldBindJSON(&role); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	userID := c.GetString("userID")
-	role.CreatedBy = userID
-	role.UpdatedBy = userID
-
-	if err := h.rbacStorage.CreateRole(&role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, role)
-}
-
 func (h *Handler) GetRoles(c *gin.Context) {
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	roles, err := h.rbacStorage.GetRoles(skip, limit)
+	roles, err := h.rbacStorage.GetRoles(skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, roles)
+	total, err := h.rbacStorage.GetRolesCount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     roles,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetRoleByID(c *gin.Context) {
@@ -450,28 +578,68 @@ func (h *Handler) GetRoleByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, role)
 }
 
-func (h *Handler) UpdateRole(c *gin.Context) {
-	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
-		return
+func (h *Handler) CreateRole(c *gin.Context) {
+	var req struct {
+		Name          string   `json:"name" binding:"required"`
+		Code          string   `json:"code" binding:"required"`
+		Description   string   `json:"description"`
+		PermissionIDs []string `json:"permission_ids"`
 	}
 
-	var role models.Role
-	if err := c.ShouldBindJSON(&role); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	role.ID = objectID
-	role.UpdatedBy = c.GetString("userID")
+	role := &models.Role{
+		Name:          req.Name,
+		Code:          req.Code,
+		Description:   req.Description,
+		PermissionIDs: req.PermissionIDs,
+	}
 
-	if err := h.rbacStorage.UpdateRole(&role); err != nil {
+	if err := h.rbacStorage.CreateRole(role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, role)
+}
+
+func (h *Handler) UpdateRole(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Name          string   `json:"name"`
+		Description   string   `json:"description"`
+		PermissionIDs []string `json:"permission_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	role, err := h.rbacStorage.GetRoleByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
+	}
+
+	if req.Name != "" {
+		role.Name = req.Name
+	}
+	if req.Description != "" {
+		role.Description = req.Description
+	}
+	if req.PermissionIDs != nil {
+		role.PermissionIDs = req.PermissionIDs
+	}
+
+	if err := h.rbacStorage.UpdateRole(role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -485,7 +653,6 @@ func (h *Handler) DeleteRole(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Role deleted successfully"})
 }
 
@@ -500,56 +667,72 @@ func (h *Handler) AssignPermissionToRole(c *gin.Context) {
 		return
 	}
 
-	operatorID := c.GetString("userID")
-	if err := h.rbacStorage.AssignPermissionToRole(roleID, req.PermissionID, operatorID); err != nil {
+	role, err := h.rbacStorage.GetRoleByID(roleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
+	}
+
+	for _, permID := range role.PermissionIDs {
+		if permID == req.PermissionID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permission already assigned"})
+			return
+		}
+	}
+
+	role.PermissionIDs = append(role.PermissionIDs, req.PermissionID)
+	if err := h.rbacStorage.UpdateRole(role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Permission assigned to role successfully"})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) RemovePermissionFromRole(c *gin.Context) {
 	roleID := c.Param("id")
 	permissionID := c.Param("permissionId")
 
-	if err := h.rbacStorage.RemovePermissionFromRole(roleID, permissionID); err != nil {
+	role, err := h.rbacStorage.GetRoleByID(roleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+		return
+	}
+
+	newPermissionIDs := []string{}
+	for _, id := range role.PermissionIDs {
+		if id != permissionID {
+			newPermissionIDs = append(newPermissionIDs, id)
+		}
+	}
+
+	role.PermissionIDs = newPermissionIDs
+	if err := h.rbacStorage.UpdateRole(role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Permission removed from role successfully"})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) GetRolePermissions(c *gin.Context) {
 	roleID := c.Param("id")
 
-	permissions, err := h.rbacStorage.GetRolePermissions(roleID)
+	role, err := h.rbacStorage.GetRoleByID(roleID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
 		return
+	}
+
+	permissions := []models.Permission{}
+	for _, permID := range role.PermissionIDs {
+		perm, err := h.rbacStorage.GetPermissionByID(permID)
+		if err == nil {
+			permissions = append(permissions, *perm)
+		}
 	}
 
 	c.JSON(http.StatusOK, permissions)
-}
-
-func (h *Handler) CreateFieldDefinition(c *gin.Context) {
-	var field models.FieldDefinition
-	if err := c.ShouldBindJSON(&field); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	userID := c.GetString("userID")
-	field.CreatedBy = userID
-	field.UpdatedBy = userID
-
-	if err := h.storage.CreateFieldDefinition(&field); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, field)
 }
 
 func (h *Handler) GetFieldDefinitionsByModule(c *gin.Context) {
@@ -559,7 +742,6 @@ func (h *Handler) GetFieldDefinitionsByModule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, fields)
 }
 
@@ -570,28 +752,74 @@ func (h *Handler) GetFieldDefinitionByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Field definition not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, field)
 }
 
-func (h *Handler) UpdateFieldDefinition(c *gin.Context) {
-	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid field ID"})
-		return
+func (h *Handler) CreateFieldDefinition(c *gin.Context) {
+	var req struct {
+		Module      string              `json:"module" binding:"required"`
+		FieldName   string              `json:"field_name" binding:"required"`
+		FieldType   string              `json:"field_type" binding:"required"`
+		Description string              `json:"description"`
+		Constraints *models.Constraints `json:"constraints"`
 	}
 
-	var field models.FieldDefinition
-	if err := c.ShouldBindJSON(&field); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	field.ID = objectID
-	field.UpdatedBy = c.GetString("userID")
+	field := &models.FieldDefinition{
+		Module:      req.Module,
+		FieldName:   req.FieldName,
+		FieldType:   models.FieldType(req.FieldType),
+		Description: req.Description,
+		Constraints: *req.Constraints,
+	}
 
-	if err := h.storage.UpdateFieldDefinition(&field); err != nil {
+	if err := h.storage.CreateFieldDefinition(field); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, field)
+}
+
+func (h *Handler) UpdateFieldDefinition(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		FieldName   string              `json:"field_name"`
+		FieldType   string              `json:"field_type"`
+		Description string              `json:"description"`
+		Constraints *models.Constraints `json:"constraints"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	field, err := h.storage.GetFieldDefinitionByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Field definition not found"})
+		return
+	}
+
+	if req.FieldName != "" {
+		field.FieldName = req.FieldName
+	}
+	if req.FieldType != "" {
+		field.FieldType = models.FieldType(req.FieldType)
+	}
+	if req.Description != "" {
+		field.Description = req.Description
+	}
+	if req.Constraints != nil {
+		field.Constraints = *req.Constraints
+	}
+
+	if err := h.storage.UpdateFieldDefinition(field); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -605,33 +833,61 @@ func (h *Handler) DeleteFieldDefinition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Field definition deleted successfully"})
 }
 
 func (h *Handler) CreateBusinessData(c *gin.Context) {
-	var data models.BusinessData
-	if err := c.ShouldBindJSON(&data); err != nil {
+	var req struct {
+		Module       string                 `json:"module" binding:"required"`
+		DataPath     string                 `json:"data_path" binding:"required"`
+		ScraperPath  string                 `json:"scraper_path" binding:"required"`
+		Description  string                 `json:"description"`
+		CustomFields map[string]interface{} `json:"custom_fields"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	userID := c.GetString("userID")
-	data.CreatedBy = userID
-	data.UpdatedBy = userID
+	_, err := h.storage.GetCollectionByModule(req.Module)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("模块不存在: %s，请先创建模块集合", req.Module)})
+		return
+	}
 
-	if err := h.storage.CreateBusinessData(&data); err != nil {
+	task := &models.ScrapeTask{
+		Module:      req.Module,
+		DataPath:    req.DataPath,
+		ScraperPath: req.ScraperPath,
+		Status:      models.ScrapeTaskStatusPending,
+	}
+
+	userID, _ := c.Get("user_id")
+	if userID != nil {
+		task.CreatedBy = userID.(string)
+	} else {
+		task.CreatedBy = "unknown"
+	}
+
+	if err := h.scraper.SubmitTask(task); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, data)
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "数据上传成功，刮削任务已开始",
+		"task_id":   task.ID,
+		"module":    req.Module,
+		"data_path": req.DataPath,
+	})
 }
 
 func (h *Handler) GetBusinessDataByModule(c *gin.Context) {
 	module := c.Param("module")
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
 	jqlQuery := c.Query("jql")
 	filter := bson.M{}
@@ -644,18 +900,30 @@ func (h *Handler) GetBusinessDataByModule(c *gin.Context) {
 		}
 	}
 
-	dataList, err := h.storage.GetBusinessDataByModule(module, filter, skip, limit)
+	dataList, err := h.storage.GetBusinessDataByModule(module, filter, skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, dataList)
+	total, err := h.storage.GetBusinessDataCount(module, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     dataList,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetBusinessDataByID(c *gin.Context) {
+	module := c.Param("module")
 	id := c.Param("id")
-	data, err := h.storage.GetBusinessDataByID(id)
+	data, err := h.storage.GetBusinessDataByID(module, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Business data not found"})
 		return
@@ -665,23 +933,33 @@ func (h *Handler) GetBusinessDataByID(c *gin.Context) {
 }
 
 func (h *Handler) UpdateBusinessData(c *gin.Context) {
+	module := c.Param("module")
 	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data ID"})
-		return
+
+	var req struct {
+		Description  string                 `json:"description"`
+		CustomFields map[string]interface{} `json:"custom_fields"`
 	}
 
-	var data models.BusinessData
-	if err := c.ShouldBindJSON(&data); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	data.ID = objectID
-	data.UpdatedBy = c.GetString("userID")
+	data, err := h.storage.GetBusinessDataByID(module, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Business data not found"})
+		return
+	}
 
-	if err := h.storage.UpdateBusinessData(&data); err != nil {
+	if req.Description != "" {
+		data.Description = req.Description
+	}
+	if req.CustomFields != nil {
+		data.CustomFields = req.CustomFields
+	}
+
+	if err := h.storage.UpdateBusinessData(data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -691,9 +969,13 @@ func (h *Handler) UpdateBusinessData(c *gin.Context) {
 
 func (h *Handler) DeleteBusinessData(c *gin.Context) {
 	id := c.Param("id")
-	userID := c.GetString("userID")
+	userID, _ := c.Get("user_id")
+	userIDStr := "unknown"
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
 
-	if err := h.storage.DeleteBusinessData(id, userID); err != nil {
+	if err := h.storage.DeleteBusinessData(id, userIDStr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -703,16 +985,21 @@ func (h *Handler) DeleteBusinessData(c *gin.Context) {
 
 func (h *Handler) GetDeletedDataByModule(c *gin.Context) {
 	module := c.Param("module")
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	dataList, err := h.storage.GetDeletedDataByModule(module, skip, limit)
+	dataList, err := h.storage.GetDeletedDataByModule(module, skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, dataList)
+	c.JSON(http.StatusOK, gin.H{
+		"data":     dataList,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetDeletedDataByID(c *gin.Context) {
@@ -728,9 +1015,13 @@ func (h *Handler) GetDeletedDataByID(c *gin.Context) {
 
 func (h *Handler) RecoverDeletedData(c *gin.Context) {
 	id := c.Param("id")
-	userID := c.GetString("userID")
+	userID, _ := c.Get("user_id")
+	userIDStr := "unknown"
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
 
-	if err := h.storage.RecoverDeletedData(id, userID); err != nil {
+	if err := h.storage.RecoverDeletedData(id, userIDStr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -738,13 +1029,11 @@ func (h *Handler) RecoverDeletedData(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Data recovered successfully"})
 }
 
-// 刮削任务相关处理函数
-
-func (h *Handler) UploadScrapeTask(c *gin.Context) {
+func (h *Handler) SubmitScrapeTask(c *gin.Context) {
 	var req struct {
+		Module      string `json:"module" binding:"required"`
 		DataPath    string `json:"data_path" binding:"required"`
 		ScraperPath string `json:"scraper_path" binding:"required"`
-		Module      string `json:"module" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -752,46 +1041,56 @@ func (h *Handler) UploadScrapeTask(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetString("userID")
-
-	// 创建刮削任务
 	task := &models.ScrapeTask{
 		Module:      req.Module,
 		DataPath:    req.DataPath,
 		ScraperPath: req.ScraperPath,
-		Status:      models.ScrapeTaskStatusScraping,
-		BaseModel: models.BaseModel{
-			CreatedBy: userID,
-			UpdatedBy: userID,
-		},
+		Status:      models.ScrapeTaskStatusPending,
 	}
 
-	// 提交任务到刮削系统
-	err := h.scraper.SubmitTask(task)
-	if err != nil {
+	userID, _ := c.Get("user_id")
+	if userID != nil {
+		task.CreatedBy = userID.(string)
+	} else {
+		task.CreatedBy = "unknown"
+	}
+
+	if err := h.scraper.SubmitTask(task); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Scrape task submitted successfully",
-		"task_id": task.ID.Hex(),
+		"task_id": task.ID,
 	})
 }
 
 func (h *Handler) GetScrapeTasks(c *gin.Context) {
 	module := c.Query("module")
 	status := c.Query("status")
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	tasks, err := h.storage.GetScrapeTasksByModule(module, status, skip, limit)
+	tasks, err := h.storage.GetScrapeTasksByModule(module, status, skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, tasks)
+	total, err := h.storage.GetScrapeTasksCount(module, bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     tasks,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetScrapeTaskByID(c *gin.Context) {
@@ -807,8 +1106,9 @@ func (h *Handler) GetScrapeTaskByID(c *gin.Context) {
 
 func (h *Handler) RetryScrapeTask(c *gin.Context) {
 	id := c.Param("id")
+
 	var req struct {
-		ScraperPath string `json:"scraper_path" binding:"required"`
+		ScraperPath string `json:"scraper_path"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -816,36 +1116,29 @@ func (h *Handler) RetryScrapeTask(c *gin.Context) {
 		return
 	}
 
-	// 获取原任务
 	task, err := h.storage.GetScrapeTaskByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Scrape task not found"})
 		return
 	}
 
-	// 创建新任务
-	userID := c.GetString("userID")
-	newTask := &models.ScrapeTask{
-		Module:      task.Module,
-		DataPath:    task.DataPath,
-		ScraperPath: req.ScraperPath,
-		Status:      models.ScrapeTaskStatusScraping,
-		BaseModel: models.BaseModel{
-			CreatedBy: userID,
-			UpdatedBy: userID,
-		},
+	if req.ScraperPath != "" {
+		task.ScraperPath = req.ScraperPath
 	}
 
-	// 提交新任务
-	err = h.scraper.SubmitTask(newTask)
-	if err != nil {
+	task.Status = models.ScrapeTaskStatusPending
+	task.ErrorMessage = ""
+	task.StartedAt = nil
+	task.CompletedAt = nil
+
+	if err := h.scraper.SubmitTask(task); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Scrape task retried successfully",
-		"task_id": newTask.ID.Hex(),
+		"message": "Scrape task retry submitted",
+		"task_id": task.ID,
 	})
 }
 
@@ -859,43 +1152,75 @@ func (h *Handler) DeleteScrapeTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Scrape task deleted successfully"})
 }
 
-// 集合管理相关处理函数
-
-func (h *Handler) CreateCollection(c *gin.Context) {
-	var collection models.Collection
-	if err := c.ShouldBindJSON(&collection); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func (h *Handler) GetDeletedScrapeTasksByModule(c *gin.Context) {
+	module := c.Param("module")
+	// 如果module为"all"，则查询所有模块的删除任务
+	if module == "all" {
+		module = ""
 	}
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
 
-	userID := c.GetString("userID")
-	collection.CreatedBy = userID
-	collection.UpdatedBy = userID
-
-	// 设置集合名称
-	if collection.CollectionName == "" {
-		collection.CollectionName = collection.Module + "_data"
-	}
-
-	if err := h.storage.CreateCollection(&collection); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, collection)
-}
-
-func (h *Handler) GetCollections(c *gin.Context) {
-	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
-	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
-
-	collections, err := h.storage.GetCollections(skip, limit)
+	tasks, err := h.storage.GetDeletedScrapeTasks(module, skip, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, collections)
+	total, err := h.storage.GetDeletedScrapeTasksCount(module)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     tasks,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
+}
+
+func (h *Handler) GetDeletedScrapeTaskByID(c *gin.Context) {
+	id := c.Param("id")
+
+	task, err := h.storage.GetDeletedScrapeTaskByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Deleted scrape task not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+func (h *Handler) RecoverScrapeTask(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.storage.RecoverScrapeTask(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Scrape task recovered successfully"})
+}
+
+func (h *Handler) GetCollections(c *gin.Context) {
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
+	skip := (page - 1) * pageSize
+
+	collections, err := h.storage.GetCollections(skip, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":     collections,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handler) GetCollectionByModule(c *gin.Context) {
@@ -909,18 +1234,67 @@ func (h *Handler) GetCollectionByModule(c *gin.Context) {
 	c.JSON(http.StatusOK, collection)
 }
 
-func (h *Handler) UpdateCollection(c *gin.Context) {
-	module := c.Param("module")
-	var collection models.Collection
-	if err := c.ShouldBindJSON(&collection); err != nil {
+func (h *Handler) CreateCollection(c *gin.Context) {
+	var req struct {
+		Module        string `json:"module" binding:"required"`
+		Description   string `json:"description"`
+		DatatypeOwner string `json:"datatype_owner"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	collection.Module = module
-	collection.UpdatedBy = c.GetString("userID")
+	collection := &models.Collection{
+		Module:         req.Module,
+		Description:    req.Description,
+		DatatypeOwner:  req.DatatypeOwner,
+		CollectionName: req.Module + "_data",
+	}
 
-	if err := h.storage.UpdateCollection(&collection); err != nil {
+	userID, _ := c.Get("user_id")
+	if userID != nil {
+		collection.CreatedBy = userID.(string)
+	} else {
+		collection.CreatedBy = "unknown"
+	}
+
+	if err := h.storage.CreateCollection(collection); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, collection)
+}
+
+func (h *Handler) UpdateCollection(c *gin.Context) {
+	module := c.Param("module")
+
+	var req struct {
+		Description   string `json:"description"`
+		DatatypeOwner string `json:"datatype_owner"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	collection, err := h.storage.GetCollectionByModule(module)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Collection not found"})
+		return
+	}
+
+	if req.Description != "" {
+		collection.Description = req.Description
+	}
+	if req.DatatypeOwner != "" {
+		collection.DatatypeOwner = req.DatatypeOwner
+	}
+
+	if err := h.storage.UpdateCollection(collection); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -940,13 +1314,10 @@ func (h *Handler) DeleteCollection(c *gin.Context) {
 
 func (h *Handler) CreateCollectionIndex(c *gin.Context) {
 	module := c.Param("module")
+
 	var req struct {
-		Keys    bson.M `json:"keys" binding:"required"`
-		Options struct {
-			Unique     bool   `json:"unique"`
-			Background bool   `json:"background"`
-			Name       string `json:"name"`
-		} `json:"options"`
+		Keys    map[string]interface{} `json:"keys" binding:"required"`
+		Options map[string]interface{} `json:"options"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -954,28 +1325,28 @@ func (h *Handler) CreateCollectionIndex(c *gin.Context) {
 		return
 	}
 
-	// 获取集合信息
-	collection, err := h.storage.GetCollectionByModule(module)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Collection not found"})
-		return
+	collectionName := module + "_data"
+
+	keys := bson.M{}
+	for k, v := range req.Keys {
+		keys[k] = v
 	}
 
-	// 创建索引选项
-	indexOptions := &options.IndexOptions{}
-	if req.Options.Unique {
-		indexOptions.SetUnique(true)
-	}
-	if req.Options.Background {
-		indexOptions.SetBackground(true)
-	}
-	if req.Options.Name != "" {
-		indexOptions.SetName(req.Options.Name)
+	var opts *options.IndexOptions
+	if req.Options != nil {
+		opts = options.Index()
+		if name, ok := req.Options["name"].(string); ok {
+			opts.SetName(name)
+		}
+		if unique, ok := req.Options["unique"].(bool); ok {
+			opts.SetUnique(unique)
+		}
+		if background, ok := req.Options["background"].(bool); ok {
+			opts.SetBackground(background)
+		}
 	}
 
-	// 创建索引
-	err = h.storage.CreateIndex(collection.CollectionName, req.Keys, indexOptions)
-	if err != nil {
+	if err := h.storage.CreateIndex(collectionName, keys, opts); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -984,15 +1355,37 @@ func (h *Handler) CreateCollectionIndex(c *gin.Context) {
 }
 
 func (h *Handler) GetCollectionIndexes(c *gin.Context) {
-	// 简化实现：返回索引列表
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Index list not implemented",
-	})
+	module := c.Param("module")
+	collectionName := module + "_data"
+
+	coll := h.storage.GetDynamicCollection(collectionName)
+	indexes, err := coll.Indexes().List(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer indexes.Close(context.Background())
+
+	var result []bson.M
+	if err := indexes.All(context.Background(), &result); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) DeleteCollectionIndex(c *gin.Context) {
-	// 简化实现：删除索引
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Index deletion not implemented",
-	})
+	module := c.Param("module")
+	indexName := c.Param("name")
+
+	collectionName := module + "_data"
+	coll := h.storage.GetDynamicCollection(collectionName)
+
+	if _, err := coll.Indexes().DropOne(context.Background(), indexName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Index deleted successfully"})
 }

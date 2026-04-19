@@ -66,15 +66,30 @@ func main() {
 		time.Duration(getEnvAsInt("JWT_REFRESH_EXPIRATION", 720))*time.Hour,
 	)
 
-	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem)
+	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem, jwtService)
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
+	// 添加CORS中间件
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	router.Use(logger.LoggerMiddleware())
 	router.Use(gin.Recovery())
 
-	handler.RegisterRoutes(router, jwtService)
+	handler.RegisterRoutes(router)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", getEnv("SERVER_HOST", "0.0.0.0"), getEnv("SERVER_PORT", "8080")),
@@ -85,10 +100,7 @@ func main() {
 
 	go func() {
 		logger.Info("Server starting on %s", server.Addr)
-		if err := server.ListenAndServeTLS(
-			getEnv("TLS_CERT", "cert.pem"),
-			getEnv("TLS_KEY", "key.pem"),
-		); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			panic("Failed to start server: " + err.Error())
 		}
 	}()

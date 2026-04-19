@@ -3,8 +3,8 @@ import type { AxiosError } from 'axios'
 import { useAuthStore } from '../stores/authStore'
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8080',
-  timeout: 10000,
+  baseURL: 'http://localhost:9003',
+  timeout: 10000
 })
 
 apiClient.interceptors.request.use(
