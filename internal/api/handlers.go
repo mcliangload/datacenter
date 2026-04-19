@@ -742,7 +742,9 @@ func (h *Handler) GetFieldDefinitionsByModule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, fields)
+	c.JSON(http.StatusOK, gin.H{
+		"data": fields,
+	})
 }
 
 func (h *Handler) GetFieldDefinitionByID(c *gin.Context) {
@@ -774,7 +776,9 @@ func (h *Handler) CreateFieldDefinition(c *gin.Context) {
 		FieldName:   req.FieldName,
 		FieldType:   models.FieldType(req.FieldType),
 		Description: req.Description,
-		Constraints: *req.Constraints,
+	}
+	if req.Constraints != nil {
+		field.Constraints = *req.Constraints
 	}
 
 	if err := h.storage.CreateFieldDefinition(field); err != nil {

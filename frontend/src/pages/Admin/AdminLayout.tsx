@@ -17,16 +17,29 @@ const AdminLayout: React.FC = () => {
     const path = location.pathname
     const segments = path.split('/').filter(Boolean)
 
+    // 处理刮削中心的特殊情况，不显示子标题
+    if (segments.includes('scraper')) {
+      setBreadcrumbItems([
+        { title: '管理后台' },
+        { title: '刮削中心' }
+      ])
+      return
+    }
+
     const items: { title: string }[] = segments.map((segment) => {
       let title = segment
 
       const titleMap: Record<string, string> = {
         'admin': '管理后台',
         'search': '数据搜索',
+        'collection-query': '集合查询',
+        'custom-fields': '自定义字段',
+        'user-center': '用户中心',
         'users': '用户管理',
         'roles': '角色管理',
         'permissions': '权限管理',
-        'scraper': '刮削中心'
+        'scraper': '刮削中心',
+        'data-management': '数据管理'
       }
 
       if (titleMap[segment]) {
@@ -66,34 +79,65 @@ const AdminLayout: React.FC = () => {
 
   const menuItems = [
     {
-      key: 'scraper',
-      label: '刮削中心',
+          key: 'scraper',
+          label: '刮削中心',
+          icon: <DatabaseOutlined />,
+          children: [
+            {
+              key: 'data-query',
+              label: '数据查询',
+              onClick: () => navigate('/admin/scraper'),
+            },
+            {
+              key: 'deleted-data-query',
+              label: '删除数据查询',
+              onClick: () => navigate('/admin/deleted-scraper'),
+            },
+          ],
+        },
+    {
+      key: 'data-management',
+      label: '数据管理',
       icon: <DatabaseOutlined />,
-      onClick: () => navigate('/admin/scraper'),
+      children: [
+        {
+          key: 'search',
+          label: '数据搜索',
+          onClick: () => navigate('/admin/search'),
+        },
+        {
+          key: 'collection-query',
+          label: '集合查询',
+          onClick: () => navigate('/admin/collection-query'),
+        },
+        {
+          key: 'custom-fields',
+          label: '自定义字段',
+          onClick: () => navigate('/admin/custom-fields'),
+        },
+      ],
     },
     {
-      key: 'search',
-      label: '数据搜索',
-      icon: <SearchOutlined />,
-      onClick: () => navigate('/admin/search'),
-    },
-    {
-      key: 'users',
-      label: '用户管理',
+      key: 'user-center',
+      label: '用户中心',
       icon: <UserAddOutlined />,
-      onClick: () => navigate('/admin/users'),
-    },
-    {
-      key: 'roles',
-      label: '角色管理',
-      icon: <TeamOutlined />,
-      onClick: () => navigate('/admin/roles'),
-    },
-    {
-      key: 'permissions',
-      label: '权限管理',
-      icon: <LockOutlined />,
-      onClick: () => navigate('/admin/permissions'),
+      children: [
+        {
+          key: 'users',
+          label: '用户管理',
+          onClick: () => navigate('/admin/users'),
+        },
+        {
+          key: 'roles',
+          label: '角色管理',
+          onClick: () => navigate('/admin/roles'),
+        },
+        {
+          key: 'permissions',
+          label: '权限管理',
+          onClick: () => navigate('/admin/permissions'),
+        },
+      ],
     },
   ]
 

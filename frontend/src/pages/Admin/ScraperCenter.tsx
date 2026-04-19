@@ -1,7 +1,8 @@
-import { Button, Input, Space, Table, Modal, Form, message, Tabs } from 'antd'
+import { Button, Input, Space, Table, Modal, Form, message, Select, Tabs } from 'antd'
 import { useState, useCallback, useEffect } from 'react'
 import { SearchOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RollbackOutlined } from '@ant-design/icons'
 import scraperService, { type ScrapeTask, type ScrapeTaskResponse } from '../../services/scraper'
+import apiClient from '../../services/api'
 
 const ScraperCenter: React.FC = () => {
   const [keyword, setKeyword] = useState('')
@@ -13,188 +14,94 @@ const ScraperCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState('data')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [deletedPagination, setDeletedPagination] = useState({ current: 1, pageSize: 20, total: 0 })
+  const [modules, setModules] = useState<{ value: string; label: string }[]>([])
+  const [retryModalVisible, setRetryModalVisible] = useState(false)
+  const [retryTaskId, setRetryTaskId] = useState('')
+  const [retryForm] = Form.useForm()
 
-  const handleSearch = useCallback(async () => {
+  const fetchData = useCallback(async (page: number, pageSize: number, searchKeyword: string) => {
     setLoading(true)
     try {
-      const skip = (pagination.current - 1) * pagination.pageSize
-      console.log('开始调用getScrapeTasks接口', { skip, limit: pagination.pageSize, keyword })
-      const response: ScrapeTaskResponse = await scraperService.getScrapeTasks({ 
-        skip, 
-        limit: pagination.pageSize, 
-        keyword 
+      const skip = (page - 1) * pageSize
+      console.log('开始调用getScrapeTasks接口', { page, skip, limit: pageSize, keyword: searchKeyword })
+      const response: ScrapeTaskResponse = await scraperService.getScrapeTasks({
+        skip,
+        limit: pageSize,
+        keyword: searchKeyword
       })
       console.log('getScrapeTasks接口响应', response)
       if (response && Array.isArray(response.data)) {
         console.log('数据有效，设置数据', response.data)
         setData(response.data)
-        setPagination(prev => ({ ...prev, total: response.total || 0 }))
+        setPagination(prev => ({ ...prev, total: response.total || 0, current: page, pageSize }))
       } else {
         console.error('响应数据结构不正确', response)
         message.error('响应数据结构不正确')
-        // 模拟数据
-        const mockData: ScrapeTask[] = [
-          {
-            _id: '1',
-            created_by: 'system',
-            created_at: '2026-04-19T09:15:57.181Z',
-            updated_by: 'system',
-            updated_at: '2026-04-19T09:15:57.181Z',
-            module: 'book',
-            data_path: '/data/book/18',
-            scraper_path: '/scrapers/book_scraper.py',
-            status: 'success',
-            result: [
-              { Key: 'items_scraped', Value: 964 },
-              { Key: 'duration', Value: '9h0m0s' },
-              { Key: 'success', Value: true },
-              { Key: 'details', Value: [
-                { Key: 'source', Value: 'https://example.com/book' },
-                { Key: 'categories', Value: ['category1', 'category2'] },
-                { Key: 'processed', Value: true }
-              ]}
-            ],
-            error_message: '',
-            started_at: '2026-04-18T22:15:57.181Z',
-            completed_at: '2026-04-19T07:15:57.181Z'
-          },
-          {
-            _id: '2',
-            created_by: 'system',
-            created_at: '2026-04-19T09:15:57.181Z',
-            updated_by: 'system',
-            updated_at: '2026-04-19T09:15:57.181Z',
-            module: 'movie',
-            data_path: '/data/movie/12',
-            scraper_path: '/scrapers/movie_scraper.py',
-            status: 'failed',
-            result: [],
-            error_message: 'Scraper execution failed',
-            started_at: '2026-04-18T22:15:57.181Z',
-            completed_at: '2026-04-18T22:16:57.181Z'
-          }
-        ]
-        setData(mockData)
-        setPagination(prev => ({ ...prev, total: mockData.length }))
       }
     } catch (error: any) {
       console.error('搜索失败', error)
       console.error('错误详情', error.response)
       message.error(error?.response?.data?.error || '搜索失败')
-      // 模拟数据
-      const mockData: ScrapeTask[] = [
-        {
-          _id: '1',
-          created_by: 'system',
-          created_at: '2026-04-19T09:15:57.181Z',
-          updated_by: 'system',
-          updated_at: '2026-04-19T09:15:57.181Z',
-          module: 'book',
-          data_path: '/data/book/18',
-          scraper_path: '/scrapers/book_scraper.py',
-          status: 'success',
-          result: [
-            { Key: 'items_scraped', Value: 964 },
-            { Key: 'duration', Value: '9h0m0s' },
-            { Key: 'success', Value: true },
-            { Key: 'details', Value: [
-              { Key: 'source', Value: 'https://example.com/book' },
-              { Key: 'categories', Value: ['category1', 'category2'] },
-              { Key: 'processed', Value: true }
-            ]}
-          ],
-          error_message: '',
-          started_at: '2026-04-18T22:15:57.181Z',
-          completed_at: '2026-04-19T07:15:57.181Z'
-        },
-        {
-          _id: '2',
-          created_by: 'system',
-          created_at: '2026-04-19T09:15:57.181Z',
-          updated_by: 'system',
-          updated_at: '2026-04-19T09:15:57.181Z',
-          module: 'movie',
-          data_path: '/data/movie/12',
-          scraper_path: '/scrapers/movie_scraper.py',
-          status: 'failed',
-          result: [],
-          error_message: 'Scraper execution failed',
-          started_at: '2026-04-18T22:15:57.181Z',
-          completed_at: '2026-04-18T22:16:57.181Z'
-        }
-      ]
-      setData(mockData)
-      setPagination(prev => ({ ...prev, total: mockData.length }))
     } finally {
       setLoading(false)
     }
-  }, [pagination.current, pagination.pageSize, keyword])
+  }, [])
 
-  const handleSearchDeleted = useCallback(async () => {
+  // 获取模块列表
+  const fetchModules = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/collections')
+      const moduleList = response.data.data || []
+      const moduleOptions = moduleList.map((module: any) => ({
+        value: module.module,
+        label: module.module
+      }))
+      setModules(moduleOptions)
+    } catch (error: any) {
+      console.error('获取模块列表失败', error)
+    }
+  }, [])
+
+  // 获取删除的刮削任务列表
+  const fetchDeletedData = useCallback(async (page: number, pageSize: number, searchKeyword: string) => {
     setLoading(true)
     try {
-      const skip = (deletedPagination.current - 1) * deletedPagination.pageSize
-      const response: ScrapeTaskResponse = await scraperService.getDeletedScrapeTasks({ 
-        skip, 
-        limit: deletedPagination.pageSize, 
-        keyword 
+      const skip = (page - 1) * pageSize
+      const module = searchKeyword || 'all'
+      const response: ScrapeTaskResponse = await scraperService.getDeletedScrapeTasks({
+        skip,
+        limit: pageSize,
+        keyword: module
       })
       setDeletedData(response.data || [])
-      setDeletedPagination(prev => ({ ...prev, total: response.total || 0 }))
+      setDeletedPagination(prev => ({ ...prev, total: response.total || 0, current: page, pageSize }))
     } catch (error: any) {
-      console.error('搜索失败', error)
-      message.error(error?.response?.data?.error || '搜索失败')
-      // 模拟数据
-      const mockData: ScrapeTask[] = [
-        {
-          _id: '3',
-          created_by: 'system',
-          created_at: '2026-04-18T09:15:57.181Z',
-          updated_by: 'system',
-          updated_at: '2026-04-18T09:15:57.181Z',
-          module: 'music',
-          data_path: '/data/music/25',
-          scraper_path: '/scrapers/music_scraper.py',
-          status: 'deleted',
-          result: [
-            { Key: 'items_scraped', Value: 150 },
-            { Key: 'duration', Value: '1h30m0s' },
-            { Key: 'success', Value: true }
-          ],
-          error_message: '',
-          started_at: '2026-04-17T22:15:57.181Z',
-          completed_at: '2026-04-18T00:45:57.181Z'
-        },
-        {
-          _id: '4',
-          created_by: 'system',
-          created_at: '2026-04-18T09:15:57.181Z',
-          updated_by: 'system',
-          updated_at: '2026-04-18T09:15:57.181Z',
-          module: 'game',
-          data_path: '/data/game/30',
-          scraper_path: '/scrapers/game_scraper.py',
-          status: 'deleted',
-          result: [],
-          error_message: 'Scraper execution failed',
-          started_at: '2026-04-17T22:15:57.181Z',
-          completed_at: '2026-04-17T22:16:57.181Z'
-        }
-      ]
-      setDeletedData(mockData)
-      setDeletedPagination(prev => ({ ...prev, total: mockData.length }))
+      console.error('获取已删除任务失败', error)
+      message.error(error?.response?.data?.error || '获取已删除任务失败')
     } finally {
       setLoading(false)
     }
-  }, [deletedPagination.current, deletedPagination.pageSize, keyword])
+  }, [])
+
+  useEffect(() => {
+    fetchModules()
+  }, [fetchModules])
 
   useEffect(() => {
     if (activeTab === 'data') {
-      handleSearch()
+      fetchData(pagination.current, pagination.pageSize, keyword)
     } else {
-      handleSearchDeleted()
+      fetchDeletedData(deletedPagination.current, deletedPagination.pageSize, keyword)
     }
-  }, [activeTab, handleSearch, handleSearchDeleted])
+  }, [activeTab])
+
+  const handleSearch = () => {
+    if (activeTab === 'data') {
+      fetchData(1, pagination.pageSize, keyword)
+    } else {
+      fetchDeletedData(1, deletedPagination.pageSize, keyword)
+    }
+  }
 
   const handleClear = () => {
     setKeyword('')
@@ -209,41 +116,35 @@ const ScraperCenter: React.FC = () => {
       message.success('数据创建成功')
       setCreateModalVisible(false)
       form.resetFields()
-      // 重新搜索以更新数据
       handleSearch()
     } catch (error: any) {
       console.error('创建数据失败', error)
       message.error(error?.response?.data?.error || '创建数据失败')
-      // 模拟成功
-      message.success('数据创建成功')
-      setCreateModalVisible(false)
-      form.resetFields()
-      handleSearch()
     } finally {
       setLoading(false)
     }
   }
 
   const handleRefresh = () => {
-    if (activeTab === 'data') {
-      handleSearch()
-    } else {
-      handleSearchDeleted()
-    }
+    handleSearch()
   }
 
   const handleRetry = async (id: string) => {
+    setRetryTaskId(id)
+    setRetryModalVisible(true)
+  }
+
+  const handleSubmitRetry = async (values: any) => {
     setLoading(true)
     try {
-      await scraperService.retryScrapeTask(id)
-      message.success(`重试数据 ${id} 成功`)
+      await scraperService.retryScrapeTask(retryTaskId, values.scraper_path)
+      message.success(`重试数据 ${retryTaskId} 成功`)
+      setRetryModalVisible(false)
+      retryForm.resetFields()
       handleSearch()
     } catch (error: any) {
       console.error('重试失败', error)
       message.error(error?.response?.data?.error || '重试失败')
-      // 模拟成功
-      message.success(`重试数据 ${id} 成功`)
-      handleSearch()
     } finally {
       setLoading(false)
     }
@@ -254,32 +155,21 @@ const ScraperCenter: React.FC = () => {
     try {
       await scraperService.recoverScrapeTask(id)
       message.success(`恢复数据 ${id} 成功`)
-      handleSearchDeleted()
+      handleSearch()
     } catch (error: any) {
       console.error('恢复失败', error)
       message.error(error?.response?.data?.error || '恢复失败')
-      // 模拟成功
-      message.success(`恢复数据 ${id} 成功`)
-      handleSearchDeleted()
     } finally {
       setLoading(false)
     }
   }
 
-  const handleTableChange = (newPagination: any) => {
-    setPagination(prev => ({
-      ...prev,
-      current: newPagination.current,
-      pageSize: newPagination.pageSize
-    }))
-  }
-
-  const handleDeletedTableChange = (newPagination: any) => {
-    setDeletedPagination(prev => ({
-      ...prev,
-      current: newPagination.current,
-      pageSize: newPagination.pageSize
-    }))
+  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+    if (activeTab === 'data') {
+      fetchData(pagination.current, pagination.pageSize, keyword)
+    } else {
+      fetchDeletedData(pagination.current, pagination.pageSize, keyword)
+    }
   }
 
   const dataColumns = [
@@ -299,7 +189,7 @@ const ScraperCenter: React.FC = () => {
       title: '数据路径',
       dataIndex: 'data_path',
       key: 'data_path',
-      sorter: (a: ScrapeTask, b: ScrapeTask) => a.data_path.localeCompare(b.data_path),
+      sorter: (a: ScrapeTask, b: ScrapeTask) => a.data_path.localeCompare(b.scraper_path),
     },
     {
       title: '创建时间',
@@ -350,25 +240,21 @@ const ScraperCenter: React.FC = () => {
       title: '模块',
       dataIndex: 'module',
       key: 'module',
-      sorter: (a: ScrapeTask, b: ScrapeTask) => a.module.localeCompare(b.module),
     },
     {
       title: '刮削器路径',
       dataIndex: 'scraper_path',
       key: 'scraper_path',
-      sorter: (a: ScrapeTask, b: ScrapeTask) => a.scraper_path.localeCompare(b.scraper_path),
     },
     {
       title: '数据路径',
       dataIndex: 'data_path',
       key: 'data_path',
-      sorter: (a: ScrapeTask, b: ScrapeTask) => a.data_path.localeCompare(b.data_path),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      sorter: (a: ScrapeTask, b: ScrapeTask) => a.created_at.localeCompare(b.created_at),
     },
     {
       title: '状态',
@@ -410,51 +296,29 @@ const ScraperCenter: React.FC = () => {
           style={{ width: 300 }}
           prefix={<SearchOutlined />}
         />
-        <Button type="primary" onClick={activeTab === 'data' ? handleSearch : handleSearchDeleted} loading={loading} icon={<SearchOutlined />}>
+        <Button type="primary" onClick={handleSearch} loading={loading} icon={<SearchOutlined />}>
           搜索
         </Button>
         <Button onClick={handleClear}>
           清除
         </Button>
       </Space>
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <Tabs.TabPane tab="数据查询" key="data">
-          <Table 
-            columns={dataColumns} 
-            dataSource={data} 
-            loading={loading}
-            rowKey="_id"
-            rowSelection={{}}
-            pagination={{ 
-              current: pagination.current,
-              pageSize: pagination.pageSize,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条记录`,
-              total: pagination.total,
-              onChange: handleTableChange
-            }}
-          />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="删除数据查询" key="deleted">
-          <Table 
-            columns={deletedColumns} 
-            dataSource={deletedData} 
-            loading={loading}
-            rowKey="_id"
-            rowSelection={{}}
-            pagination={{ 
-              current: deletedPagination.current,
-              pageSize: deletedPagination.pageSize,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条记录`,
-              total: deletedPagination.total,
-              onChange: handleDeletedTableChange
-            }}
-          />
-        </Tabs.TabPane>
-      </Tabs>
+      <Table
+        columns={dataColumns}
+        dataSource={data}
+        loading={loading}
+        rowKey="_id"
+        rowSelection={{}}
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条记录`,
+          total: pagination.total
+        }}
+        onChange={handleTableChange}
+      />
 
       <Modal
         title="创建数据"
@@ -471,22 +335,32 @@ const ScraperCenter: React.FC = () => {
           <Form.Item
             name="module"
             label="模块"
-            rules={[{ required: true, message: '请输入模块名称' }]}
+            rules={[{ required: true, message: '请选择模块' }]}
           >
-            <Input placeholder="请输入模块名称" />
+            <Select
+              placeholder="选择模块"
+              options={modules}
+            />
+          </Form.Item>
+          <Form.Item
+            name="data_path"
+            label="数据路径"
+            rules={[{ required: true, message: '请输入数据路径' }]}
+          >
+            <Input placeholder="请输入数据路径，例如：/data/book" />
+          </Form.Item>
+          <Form.Item
+            name="scraper_path"
+            label="刮削器路径"
+            rules={[{ required: true, message: '请输入刮削器路径' }]}
+          >
+            <Input placeholder="请输入刮削器路径，例如：/scrapers/book_scraper.py" />
           </Form.Item>
           <Form.Item
             name="description"
             label="描述"
-            rules={[{ required: true, message: '请输入描述' }]}
           >
             <Input.TextArea rows={4} placeholder="请输入描述" />
-          </Form.Item>
-          <Form.Item
-            name="custom_fields"
-            label="自定义字段"
-          >
-            <Input.TextArea rows={2} placeholder="请输入JSON格式的自定义字段" />
           </Form.Item>
           <Form.Item>
             <Space style={{ justifyContent: 'flex-end' }}>
@@ -495,6 +369,38 @@ const ScraperCenter: React.FC = () => {
               </Button>
               <Button type="primary" htmlType="submit" loading={loading}>
                 确认创建
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="重试任务"
+        open={retryModalVisible}
+        onCancel={() => setRetryModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={retryForm}
+          layout="vertical"
+          onFinish={handleSubmitRetry}
+        >
+          <Form.Item
+            name="scraper_path"
+            label="刮削器路径"
+            tooltip="不输入则使用默认刮削器"
+          >
+            <Input placeholder="请输入刮削器路径，例如：/scrapers/book_scraper.py" />
+          </Form.Item>
+          <Form.Item>
+            <Space style={{ justifyContent: 'flex-end' }}>
+              <Button onClick={() => setRetryModalVisible(false)}>
+                取消
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                确认重试
               </Button>
             </Space>
           </Form.Item>
