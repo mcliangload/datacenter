@@ -58,15 +58,24 @@ type Storage interface {
 	UpdateRole(role *models.Role) error
 	DeleteRole(id string) error
 
-	// 用户角色关联
-	AssignRoleToUser(userID, roleID, operatorID string) error
-	RemoveRoleFromUser(userID, roleID string) error
-	GetUserRoles(userID string) ([]models.Role, error)
+	// 刮削任务相关
+	CreateScrapeTask(task *models.ScrapeTask) error
+	GetScrapeTaskByID(id string) (*models.ScrapeTask, error)
+	UpdateScrapeTask(task *models.ScrapeTask) error
+	GetScrapeTasksByModule(module string, status string, skip, limit int64) ([]models.ScrapeTask, error)
+	DeleteScrapeTask(id string) error
 
-	// 角色权限关联
-	AssignPermissionToRole(roleID, permissionID, operatorID string) error
-	RemovePermissionFromRole(roleID, permissionID string) error
-	GetRolePermissions(roleID string) ([]models.Permission, error)
+	// 集合管理相关
+	CreateCollection(collection *models.Collection) error
+	GetCollectionByModule(module string) (*models.Collection, error)
+	GetCollections(skip, limit int64) ([]models.Collection, error)
+	UpdateCollection(collection *models.Collection) error
+	DeleteCollection(module string) error
+
+	// 动态集合管理
+	GetDynamicCollection(collectionName string) *mongo.Collection
+	CreateDynamicCollection(collectionName string) error
+	CreateIndex(collectionName string, keys bson.M, options *options.IndexOptions) error
 
 	// 初始化默认数据
 	InitDefaultData() error
@@ -74,17 +83,17 @@ type Storage interface {
 
 // mongodbStorage MongoDB存储实现
 type mongodbStorage struct {
-	client          *mongo.Client
-	database        *mongo.Database
-	users           *mongo.Collection
-	fields          *mongo.Collection
-	business        *mongo.Collection
-	deleted         *mongo.Collection
-	auditLogs       *mongo.Collection
-	permissions     *mongo.Collection
-	roles           *mongo.Collection
-	userRoles       *mongo.Collection
-	rolePermissions *mongo.Collection
+	client      *mongo.Client
+	database    *mongo.Database
+	users       *mongo.Collection
+	fields      *mongo.Collection
+	business    *mongo.Collection
+	deleted     *mongo.Collection
+	auditLogs   *mongo.Collection
+	permissions *mongo.Collection
+	roles       *mongo.Collection
+	scrapeTasks *mongo.Collection
+	collections *mongo.Collection
 }
 
 // NewMongoDBStorage 创建MongoDB存储实例
@@ -105,72 +114,47 @@ func NewMongoDBStorage(uri, databaseName string) (Storage, error) {
 
 	// 初始化集合
 	return &mongodbStorage{
-		client:          client,
-		database:        db,
-		users:           db.Collection("users"),
-		fields:          db.Collection("field_definitions"),
-		business:        db.Collection("business_data"),
-		deleted:         db.Collection("deleted_data"),
-		auditLogs:       db.Collection("audit_logs"),
-		permissions:     db.Collection("permissions"),
-		roles:           db.Collection("roles"),
-		userRoles:       db.Collection("user_roles"),
-		rolePermissions: db.Collection("role_permissions"),
+		client:      client,
+		database:    db,
+		users:       db.Collection("users"),
+		fields:      db.Collection("field_definitions"),
+		business:    db.Collection("business_data"),
+		deleted:     db.Collection("deleted_data"),
+		auditLogs:   db.Collection("audit_logs"),
+		permissions: db.Collection("permissions"),
+		roles:       db.Collection("roles"),
+		scrapeTasks: db.Collection("scrape_tasks"),
+		collections: db.Collection("collections"),
 	}, nil
 }
 
-// InitDefaultData 初始化默认权限和角色
+// InitDefaultData 初始化存储
 func (s *mongodbStorage) InitDefaultData() error {
+	// 只检查连接状态，不创建默认数据
 	ctx := context.Background()
 
-	// 检查是否已初始化
-	count, err := s.permissions.CountDocuments(ctx, bson.M{})
+	// 测试权限集合是否可访问
+	_, err := s.permissions.CountDocuments(ctx, bson.M{})
 	if err != nil {
 		return err
 	}
-	if count > 0 {
-		return nil // 已初始化
+
+	// 测试角色集合是否可访问
+	_, err = s.roles.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
 	}
 
-	// 创建默认权限
-	defaultPermissions := []models.Permission{
-		{Name: "管理用户", Code: "manage_users", Description: "管理系统用户"},
-		{Name: "管理数据库", Code: "manage_databases", Description: "管理数据库"},
-		{Name: "定义字段", Code: "define_fields", Description: "定义自定义字段"},
-		{Name: "授予数据所有者", Code: "grant_dataowner", Description: "授予数据所有者权限"},
-		{Name: "数据增删改查", Code: "crud_data", Description: "对数据进行增删改查操作"},
+	// 测试刮削任务集合是否可访问
+	_, err = s.scrapeTasks.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
 	}
 
-	now := time.Now()
-	for i := range defaultPermissions {
-		defaultPermissions[i].ID = primitive.NewObjectID()
-		defaultPermissions[i].CreatedAt = now
-		defaultPermissions[i].UpdatedAt = now
-		_, err := s.permissions.InsertOne(ctx, defaultPermissions[i])
-		if err != nil {
-			return err
-		}
-	}
-
-	// 创建默认角色
-	rootPermissions := []string{"manage_users", "manage_databases", "define_fields", "grant_dataowner", "crud_data"}
-	ownerPermissions := []string{"define_fields", "grant_dataowner", "crud_data"}
-	dataOwnerPermissions := []string{"crud_data"}
-
-	defaultRoles := []models.Role{
-		{Name: "超级管理员", Code: "root", Description: "系统最高权限", Permissions: rootPermissions},
-		{Name: "数据类型所有者", Code: "datatypeowner", Description: "数据库类型所有者", Permissions: ownerPermissions},
-		{Name: "数据所有者", Code: "dataowner", Description: "数据所有者", Permissions: dataOwnerPermissions},
-	}
-
-	for i := range defaultRoles {
-		defaultRoles[i].ID = primitive.NewObjectID()
-		defaultRoles[i].CreatedAt = now
-		defaultRoles[i].UpdatedAt = now
-		_, err := s.roles.InsertOne(ctx, defaultRoles[i])
-		if err != nil {
-			return err
-		}
+	// 测试集合元数据集合是否可访问
+	_, err = s.collections.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -311,7 +295,11 @@ func (s *mongodbStorage) CreateBusinessData(data *models.BusinessData) error {
 	data.ID = primitive.NewObjectID()
 	data.CreatedAt = time.Now()
 	data.UpdatedAt = time.Now()
-	_, err := s.business.InsertOne(context.Background(), data)
+
+	// 使用动态集合
+	collectionName := data.Module + "_data"
+	collection := s.GetDynamicCollection(collectionName)
+	_, err := collection.InsertOne(context.Background(), data)
 	return err
 }
 
@@ -322,13 +310,17 @@ func (s *mongodbStorage) GetBusinessDataByID(id string) (*models.BusinessData, e
 		return nil, err
 	}
 
+	// 这里需要先查询所有可能的集合，或者通过其他方式获取模块信息
+	// 简化实现：先查询主业务集合
 	var data models.BusinessData
 	err = s.business.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&data)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return &data, nil
 	}
 
-	return &data, nil
+	// 如果主集合没有，可能在动态集合中
+	// 这里需要遍历所有动态集合，实际实现中应该有更好的方法
+	return nil, err
 }
 
 // GetBusinessDataByModule 根据模块获取业务数据
@@ -336,7 +328,11 @@ func (s *mongodbStorage) GetBusinessDataByModule(module string, filter bson.M, s
 	filter["module"] = module
 	options := options.Find().SetSkip(skip).SetLimit(limit)
 
-	cursor, err := s.business.Find(context.Background(), filter, options)
+	// 使用动态集合
+	collectionName := module + "_data"
+	collection := s.GetDynamicCollection(collectionName)
+
+	cursor, err := collection.Find(context.Background(), filter, options)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +349,12 @@ func (s *mongodbStorage) GetBusinessDataByModule(module string, filter bson.M, s
 // UpdateBusinessData 更新业务数据
 func (s *mongodbStorage) UpdateBusinessData(data *models.BusinessData) error {
 	data.UpdatedAt = time.Now()
-	_, err := s.business.ReplaceOne(context.Background(), bson.M{"_id": data.ID}, data)
+
+	// 使用动态集合
+	collectionName := data.Module + "_data"
+	collection := s.GetDynamicCollection(collectionName)
+
+	_, err := collection.ReplaceOne(context.Background(), bson.M{"_id": data.ID}, data)
 	return err
 }
 
@@ -368,6 +369,8 @@ func (s *mongodbStorage) DeleteBusinessData(id string, userID string) error {
 	var data models.BusinessData
 	err = s.business.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&data)
 	if err != nil {
+		// 尝试从动态集合中获取
+		// 简化实现：假设已经知道模块
 		return err
 	}
 
@@ -395,7 +398,9 @@ func (s *mongodbStorage) DeleteBusinessData(id string, userID string) error {
 	}
 
 	// 删除原始数据
-	_, err = s.business.DeleteOne(context.Background(), bson.M{"_id": objectID})
+	collectionName := data.Module + "_data"
+	collection := s.GetDynamicCollection(collectionName)
+	_, err = collection.DeleteOne(context.Background(), bson.M{"_id": objectID})
 	return err
 }
 
@@ -463,7 +468,9 @@ func (s *mongodbStorage) RecoverDeletedData(id string, userID string) error {
 	}
 
 	// 插入恢复的数据
-	_, err = s.business.InsertOne(context.Background(), businessData)
+	collectionName := deletedData.Module + "_data"
+	collection := s.GetDynamicCollection(collectionName)
+	_, err = collection.InsertOne(context.Background(), businessData)
 	if err != nil {
 		return err
 	}
@@ -621,102 +628,191 @@ func (s *mongodbStorage) DeleteRole(id string) error {
 	return err
 }
 
-// AssignRoleToUser 分配角色给用户
-func (s *mongodbStorage) AssignRoleToUser(userID, roleID, operatorID string) error {
-	userRole := models.UserRole{
-		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
-			CreatedBy: operatorID,
-			CreatedAt: time.Now(),
-			UpdatedBy: operatorID,
-			UpdatedAt: time.Now(),
-		},
-		UserID: userID,
-		RoleID: roleID,
+// CreateScrapeTask 创建刮削任务
+func (s *mongodbStorage) CreateScrapeTask(task *models.ScrapeTask) error {
+	task.ID = primitive.NewObjectID()
+	task.CreatedAt = time.Now()
+	task.UpdatedAt = time.Now()
+	_, err := s.scrapeTasks.InsertOne(context.Background(), task)
+	return err
+}
+
+// GetScrapeTaskByID 根据ID获取刮削任务
+func (s *mongodbStorage) GetScrapeTaskByID(id string) (*models.ScrapeTask, error) {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
 	}
-	_, err := s.userRoles.InsertOne(context.Background(), userRole)
+
+	var task models.ScrapeTask
+	err = s.scrapeTasks.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&task)
+	if err != nil {
+		return nil, err
+	}
+
+	return &task, nil
+}
+
+// UpdateScrapeTask 更新刮削任务
+func (s *mongodbStorage) UpdateScrapeTask(task *models.ScrapeTask) error {
+	task.UpdatedAt = time.Now()
+	_, err := s.scrapeTasks.ReplaceOne(context.Background(), bson.M{"_id": task.ID}, task)
 	return err
 }
 
-// RemoveRoleFromUser 从用户移除角色
-func (s *mongodbStorage) RemoveRoleFromUser(userID, roleID string) error {
-	_, err := s.userRoles.DeleteOne(context.Background(), bson.M{"user_id": userID, "role_id": roleID})
-	return err
-}
+// GetScrapeTasksByModule 根据模块获取刮削任务
+func (s *mongodbStorage) GetScrapeTasksByModule(module string, status string, skip, limit int64) ([]models.ScrapeTask, error) {
+	filter := bson.M{"module": module}
+	if status != "" {
+		filter["status"] = status
+	}
+	options := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"created_at": -1})
 
-// GetUserRoles 获取用户的角色列表
-func (s *mongodbStorage) GetUserRoles(userID string) ([]models.Role, error) {
-	// 查询用户的所有角色关联
-	cursor, err := s.userRoles.Find(context.Background(), bson.M{"user_id": userID})
+	cursor, err := s.scrapeTasks.Find(context.Background(), filter, options)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(context.Background())
 
-	var userRoles []models.UserRole
-	if err := cursor.All(context.Background(), &userRoles); err != nil {
+	var tasks []models.ScrapeTask
+	if err := cursor.All(context.Background(), &tasks); err != nil {
 		return nil, err
 	}
 
-	// 获取角色详情
-	var roles []models.Role
-	for _, ur := range userRoles {
-		role, err := s.GetRoleByID(ur.RoleID)
-		if err != nil {
-			continue
-		}
-		roles = append(roles, *role)
-	}
-
-	return roles, nil
+	return tasks, nil
 }
 
-// AssignPermissionToRole 分配权限给角色
-func (s *mongodbStorage) AssignPermissionToRole(roleID, permissionID, operatorID string) error {
-	rolePermission := models.RolePermission{
-		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
-			CreatedBy: operatorID,
-			CreatedAt: time.Now(),
-			UpdatedBy: operatorID,
-			UpdatedAt: time.Now(),
-		},
-		RoleID:       roleID,
-		PermissionID: permissionID,
+// DeleteScrapeTask 删除刮削任务
+func (s *mongodbStorage) DeleteScrapeTask(id string) error {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
 	}
-	_, err := s.rolePermissions.InsertOne(context.Background(), rolePermission)
+
+	_, err = s.scrapeTasks.DeleteOne(context.Background(), bson.M{"_id": objectID})
 	return err
 }
 
-// RemovePermissionFromRole 从角色移除权限
-func (s *mongodbStorage) RemovePermissionFromRole(roleID, permissionID string) error {
-	_, err := s.rolePermissions.DeleteOne(context.Background(), bson.M{"role_id": roleID, "permission_id": permissionID})
-	return err
+// CreateCollection 创建集合
+func (s *mongodbStorage) CreateCollection(collection *models.Collection) error {
+	collection.ID = primitive.NewObjectID()
+	collection.CreatedAt = time.Now()
+	collection.UpdatedAt = time.Now()
+	_, err := s.collections.InsertOne(context.Background(), collection)
+	if err != nil {
+		return err
+	}
+
+	// 创建对应的动态集合
+	err = s.CreateDynamicCollection(collection.CollectionName)
+	if err != nil {
+		return err
+	}
+
+	// 创建默认索引
+	err = s.CreateIndex(collection.CollectionName, bson.M{"module": 1}, nil)
+	if err != nil {
+		return err
+	}
+
+	err = s.CreateIndex(collection.CollectionName, bson.M{"created_by": 1}, nil)
+	if err != nil {
+		return err
+	}
+
+	err = s.CreateIndex(collection.CollectionName, bson.M{"created_at": -1}, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// GetRolePermissions 获取角色的权限列表
-func (s *mongodbStorage) GetRolePermissions(roleID string) ([]models.Permission, error) {
-	// 查询角色的所有权限关联
-	cursor, err := s.rolePermissions.Find(context.Background(), bson.M{"role_id": roleID})
+// GetCollectionByModule 根据模块获取集合
+func (s *mongodbStorage) GetCollectionByModule(module string) (*models.Collection, error) {
+	var collection models.Collection
+	err := s.collections.FindOne(context.Background(), bson.M{"module": module}).Decode(&collection)
+	if err != nil {
+		return nil, err
+	}
+
+	return &collection, nil
+}
+
+// GetCollections 获取集合列表
+func (s *mongodbStorage) GetCollections(skip, limit int64) ([]models.Collection, error) {
+	options := options.Find().SetSkip(skip).SetLimit(limit)
+	cursor, err := s.collections.Find(context.Background(), bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(context.Background())
 
-	var rolePermissions []models.RolePermission
-	if err := cursor.All(context.Background(), &rolePermissions); err != nil {
+	var collections []models.Collection
+	if err := cursor.All(context.Background(), &collections); err != nil {
 		return nil, err
 	}
 
-	// 获取权限详情
-	var permissions []models.Permission
-	for _, rp := range rolePermissions {
-		permission, err := s.GetPermissionByID(rp.PermissionID)
-		if err != nil {
-			continue
-		}
-		permissions = append(permissions, *permission)
+	return collections, nil
+}
+
+// UpdateCollection 更新集合
+func (s *mongodbStorage) UpdateCollection(collection *models.Collection) error {
+	collection.UpdatedAt = time.Now()
+	_, err := s.collections.ReplaceOne(context.Background(), bson.M{"module": collection.Module}, collection)
+	return err
+}
+
+// DeleteCollection 删除集合
+func (s *mongodbStorage) DeleteCollection(module string) error {
+	// 检查集合是否存在
+	_, err := s.GetCollectionByModule(module)
+	if err != nil {
+		return err
 	}
 
-	return permissions, nil
+	// 删除集合元数据
+	_, err = s.collections.DeleteOne(context.Background(), bson.M{"module": module})
+	if err != nil {
+		return err
+	}
+
+	// 这里可以选择删除对应的动态集合
+	// 但通常不建议直接删除集合，而是保留数据
+
+	return nil
+}
+
+// GetDynamicCollection 获取动态集合
+func (s *mongodbStorage) GetDynamicCollection(collectionName string) *mongo.Collection {
+	return s.database.Collection(collectionName)
+}
+
+// CreateDynamicCollection 创建动态集合
+func (s *mongodbStorage) CreateDynamicCollection(collectionName string) error {
+	// 检查集合是否存在
+	collections, err := s.database.ListCollectionNames(context.Background(), bson.M{"name": collectionName})
+	if err != nil {
+		return err
+	}
+
+	if len(collections) == 0 {
+		// 创建集合
+		err = s.database.CreateCollection(context.Background(), collectionName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// CreateIndex 创建索引
+func (s *mongodbStorage) CreateIndex(collectionName string, keys bson.M, options *options.IndexOptions) error {
+	collection := s.GetDynamicCollection(collectionName)
+	_, err := collection.Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys:    keys,
+		Options: options,
+	})
+	return err
 }

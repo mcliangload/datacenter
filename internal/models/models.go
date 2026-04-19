@@ -6,7 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// BaseModel 基础模型结构
 type BaseModel struct {
 	ID        primitive.ObjectID `json:"_id" bson:"_id"`
 	CreatedBy string             `json:"created_by" bson:"created_by"`
@@ -15,7 +14,6 @@ type BaseModel struct {
 	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
-// FieldType 字段类型
 type FieldType string
 
 const (
@@ -25,17 +23,15 @@ const (
 	FieldTypeList   FieldType = "list"
 )
 
-// FieldDefinition 字段定义结构
 type FieldDefinition struct {
 	BaseModel
-	Module      string     `json:"module" bson:"module"`
-	FieldName   string     `json:"field_name" bson:"field_name"`
-	FieldType   FieldType  `json:"field_type" bson:"field_type"`
-	Description string     `json:"description" bson:"description"`
+	Module      string      `json:"module" bson:"module"`
+	FieldName   string      `json:"field_name" bson:"field_name"`
+	FieldType   FieldType   `json:"field_type" bson:"field_type"`
+	Description string      `json:"description" bson:"description"`
 	Constraints Constraints `json:"constraints" bson:"constraints"`
 }
 
-// Constraints 字段约束
 type Constraints struct {
 	Min        *float64 `json:"min,omitempty" bson:"min,omitempty"`
 	Max        *float64 `json:"max,omitempty" bson:"max,omitempty"`
@@ -44,7 +40,6 @@ type Constraints struct {
 	ListLength *int     `json:"list_length,omitempty" bson:"list_length,omitempty"`
 }
 
-// BusinessData 业务数据结构
 type BusinessData struct {
 	BaseModel
 	Module       string                 `json:"module" bson:"module"`
@@ -53,7 +48,6 @@ type BusinessData struct {
 	FilePath     string                 `json:"file_path" bson:"file_path"`
 }
 
-// DeletedData 已删除数据结构
 type DeletedData struct {
 	BaseModel
 	Module       string                 `json:"module" bson:"module"`
@@ -64,17 +58,14 @@ type DeletedData struct {
 	DeletedAt    time.Time              `json:"deleted_at" bson:"deleted_at"`
 }
 
-// User 用户模型
 type User struct {
 	BaseModel
-	Username    string   `json:"username" bson:"username"`
-	Password    string   `json:"password,omitempty" bson:"password"`
-	Email       string   `json:"email" bson:"email"`
-	Roles       []string `json:"roles" bson:"roles"`
-	Permissions []string `json:"permissions" bson:"permissions"`
+	Username string   `json:"username" bson:"username"`
+	Password string   `json:"password,omitempty" bson:"password"`
+	Email    string   `json:"email" bson:"email"`
+	RoleIDs  []string `json:"role_ids" bson:"role_ids"`
 }
 
-// Permission 权限模型
 type Permission struct {
 	BaseModel
 	Name        string `json:"name" bson:"name"`
@@ -82,25 +73,38 @@ type Permission struct {
 	Description string `json:"description" bson:"description"`
 }
 
-// Role 角色模型
 type Role struct {
 	BaseModel
-	Name        string   `json:"name" bson:"name"`
-	Code        string   `json:"code" bson:"code"`
-	Description string   `json:"description" bson:"description"`
-	Permissions []string `json:"permissions" bson:"permissions"`
+	Name          string   `json:"name" bson:"name"`
+	Code          string   `json:"code" bson:"code"`
+	Description   string   `json:"description" bson:"description"`
+	PermissionIDs []string `json:"permission_ids" bson:"permission_ids"`
 }
 
-// RolePermission 角色权限关联模型
-type RolePermission struct {
+type ScrapeTaskStatus string
+
+const (
+	ScrapeTaskStatusScraping ScrapeTaskStatus = "scraping"
+	ScrapeTaskStatusSuccess  ScrapeTaskStatus = "success"
+	ScrapeTaskStatusFailed   ScrapeTaskStatus = "failed"
+)
+
+type ScrapeTask struct {
 	BaseModel
-	RoleID       string `json:"role_id" bson:"role_id"`
-	PermissionID string `json:"permission_id" bson:"permission_id"`
+	Module        string           `json:"module" bson:"module"`
+	DataPath      string           `json:"data_path" bson:"data_path"`
+	ScraperPath   string           `json:"scraper_path" bson:"scraper_path"`
+	Status        ScrapeTaskStatus `json:"status" bson:"status"`
+	Result        interface{}      `json:"result" bson:"result"`
+	ErrorMessage  string           `json:"error_message" bson:"error_message"`
+	StartedAt     *time.Time       `json:"started_at" bson:"started_at"`
+	CompletedAt   *time.Time       `json:"completed_at" bson:"completed_at"`
 }
 
-// UserRole 用户角色关联模型
-type UserRole struct {
+type Collection struct {
 	BaseModel
-	UserID string `json:"user_id" bson:"user_id"`
-	RoleID string `json:"role_id" bson:"role_id"`
+	Module          string `json:"module" bson:"module"`
+	Description     string `json:"description" bson:"description"`
+	DatatypeOwner   string `json:"datatype_owner" bson:"datatype_owner"`
+	CollectionName  string `json:"collection_name" bson:"collection_name"`
 }

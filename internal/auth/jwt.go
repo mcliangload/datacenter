@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -51,6 +52,7 @@ func (s *jwtService) GenerateToken(userID string, roles, permissions []string) (
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "datacenter",
 			Subject:   userID,
+			ID:        uuid.New().String(),
 		},
 	}
 
