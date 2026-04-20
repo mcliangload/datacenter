@@ -60,16 +60,86 @@ const RoleManagement: React.FC = () => {
   const handleAddRole = () => {
     setEditingRole(null)
     form.resetFields()
+    // 确保权限列表被清空
+    form.setFieldsValue({
+      permission_ids: []
+    })
     setModalVisible(true)
   }
 
-  const handleEditRole = (role: RoleWithPermissions) => {
+  const handleEditRole = async (role: RoleWithPermissions) => {
     setEditingRole(role)
-    form.setFieldsValue({
-      ...role,
-      permission_ids: role.permission_ids || []
-    })
-    setModalVisible(true)
+    setLoading(true)
+    try {
+      console.log('Starting edit for role:', role)
+      
+      // 确保权限列表已经加载
+      if (permissions.length === 0) {
+        console.log('Permissions not loaded, fetching...')
+        await fetchPermissions()
+      }
+      
+      console.log('Loaded permissions count:', permissions.length)
+      console.log('All permissions:', permissions.map(p => ({ id: p.id, code: p.code, name: p.name })))
+      
+      // 调用接口获取完整的角色权限数据
+      const fullRoleData = await roleService.getRoleById(role.id)
+      
+      console.log('Full role data from API:', fullRoleData)
+      console.log('Role permission_ids:', fullRoleData.permission_ids)
+      console.log('Role permission_codes:', fullRoleData.permission_codes)
+      
+      // 确定要选中的权限ID列表
+      let selectedPermissionIds: string[] = []
+      
+      if (fullRoleData.permission_ids && fullRoleData.permission_ids.length > 0) {
+        console.log('Using permission_ids for matching')
+        selectedPermissionIds = fullRoleData.permission_ids.filter(id => {
+          const exists = permissions.some(permission => permission.id === id)
+          console.log(`Checking permission_id ${id}: exists=${exists}`)
+          return exists
+        })
+      } else if (fullRoleData.permission_codes && fullRoleData.permission_codes.length > 0) {
+        console.log('Using permission_codes for matching')
+        selectedPermissionIds = fullRoleData.permission_codes
+          .map(code => {
+            const matchedPermission = permissions.find(p => p.code === code)
+            console.log(`Matching code ${code}: found=${!!matchedPermission}, id=${matchedPermission?.id}`)
+            return matchedPermission ? matchedPermission.id : null
+          })
+          .filter((id): id is string => id !== null)
+      } else {
+        console.log('No permission data found, trying to use role from list')
+        // 如果API返回的数据中没有权限信息，尝试使用列表中的角色数据
+        if (role.permission_ids && role.permission_ids.length > 0) {
+          selectedPermissionIds = role.permission_ids.filter(id => 
+            permissions.some(permission => permission.id === id)
+          )
+        }
+      }
+      
+      console.log('Final selected permission IDs:', selectedPermissionIds)
+      
+      // 重置表单
+      form.resetFields()
+      
+      // 设置表单值 - 确保异步操作完成
+      await form.setFieldsValue({
+        name: fullRoleData.name,
+        code: fullRoleData.code,
+        description: fullRoleData.description,
+        permission_ids: selectedPermissionIds
+      })
+      
+      console.log('Form fields set, opening modal')
+      setModalVisible(true)
+    } catch (error: any) {
+      console.error('获取角色详情失败', error)
+      message.error(error?.response?.data?.error || '获取角色详情失败')
+      setModalVisible(false)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDeleteRole = async (roleId: string) => {
@@ -86,11 +156,17 @@ const RoleManagement: React.FC = () => {
   const handleSubmit = async (values: any) => {
     setLoading(true)
     try {
+      // 确保 permission_ids 是数组格式
+      const submitData = {
+        ...values,
+        permission_ids: Array.isArray(values.permission_ids) ? values.permission_ids : []
+      }
+      
       if (editingRole) {
-        await roleService.updateRole(editingRole.id, values)
+        await roleService.updateRole(editingRole.id, submitData)
         message.success('角色更新成功')
       } else {
-        await roleService.createRole(values)
+        await roleService.createRole(submitData)
         message.success('角色创建成功')
       }
       setModalVisible(false)
@@ -223,7 +299,6 @@ const RoleManagement: React.FC = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={editingRole || {}}
         >
           <Form.Item
             name="name"
@@ -250,11 +325,11 @@ const RoleManagement: React.FC = () => {
             label="权限"
             rules={[{ required: true, message: '请选择权限' }]}
           >
-            <div>
-              {Object.entries(permissionGroups).map(([group, groupPermissions]) => (
-                <div key={group} style={{ marginBottom: 16 }}>
-                  <h4>{group}</h4>
-                  <Checkbox.Group>
+            <Checkbox.Group>
+              <div>
+                {Object.entries(permissionGroups).map(([group, groupPermissions]) => (
+                  <div key={group} style={{ marginBottom: 16 }}>
+                    <h4>{group}</h4>
                     <Space direction="vertical">
                       {groupPermissions.map(permission => (
                         <Checkbox key={permission.id} value={permission.id}>
@@ -262,11 +337,11 @@ const RoleManagement: React.FC = () => {
                         </Checkbox>
                       ))}
                     </Space>
-                  </Checkbox.Group>
-                  <Divider style={{ margin: '12px 0' }} />
-                </div>
-              ))}
-            </div>
+                    <Divider style={{ margin: '12px 0' }} />
+                  </div>
+                ))}
+              </div>
+            </Checkbox.Group>
           </Form.Item>
           <Form.Item>
             <Space style={{ justifyContent: 'flex-end' }}>

@@ -93,8 +93,8 @@ func main() {
 			Description:    fmt.Sprintf("%s数据模块", module),
 			DatatypeOwner:  "admin",
 			CollectionName: module + "_data",
+			ID:             primitive.NewObjectID(),
 			BaseModel: models.BaseModel{
-				ID:        primitive.NewObjectID(),
 				CreatedBy: "test",
 				CreatedAt: time.Now(),
 				UpdatedBy: "test",
@@ -168,8 +168,8 @@ func main() {
 		}
 
 		task := &models.ScrapeTask{
+			ID: taskID,
 			BaseModel: models.BaseModel{
-				ID:        taskID,
 				CreatedBy: "admin",
 				CreatedAt: createdAt,
 				UpdatedBy: "admin",
@@ -261,8 +261,8 @@ func createBusinessData(ctx context.Context, store storage.Storage, module, task
 		Description:  fmt.Sprintf("刮削数据 - %s", title),
 		CustomFields: customFields,
 		FilePath:     fmt.Sprintf("/data/%s/", module),
+		ID:           primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
 			CreatedBy: "scraper",
 			CreatedAt: scrapedAt,
 			UpdatedBy: "scraper",

@@ -52,12 +52,12 @@ func main() {
 
 func createPermissions(s storage.Storage) {
 	permissions := []models.Permission{
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "用户管理", Code: "user:manage", Description: "管理系统用户账户"},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "角色管理", Code: "role:manage", Description: "管理系统角色"},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "权限管理", Code: "permission:manage", Description: "管理系统权限"},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "数据管理", Code: "data:manage", Description: "管理业务数据"},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "刮削管理", Code: "scraper:manage", Description: "管理刮削任务"},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "集合管理", Code: "collection:manage", Description: "管理数据集合"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "用户管理", Code: "user:manage", Description: "管理系统用户账户"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "角色管理", Code: "role:manage", Description: "管理系统角色"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "权限管理", Code: "permission:manage", Description: "管理系统权限"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "数据管理", Code: "data:manage", Description: "管理业务数据"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "刮削管理", Code: "scraper:manage", Description: "管理刮削任务"},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "集合管理", Code: "collection:manage", Description: "管理数据集合"},
 	}
 
 	for _, perm := range permissions {
@@ -85,9 +85,9 @@ func createRoles(s storage.Storage) {
 	}
 
 	roles := []models.Role{
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "超级管理员", Code: "admin", Description: "系统超级管理员", PermissionIDs: permissionIDs},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "数据管理员", Code: "data_admin", Description: "数据管理权限", PermissionIDs: permissionIDs[3:6]},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "普通用户", Code: "user", Description: "普通用户权限", PermissionIDs: permissionIDs[3:4]},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "超级管理员", Code: "admin", Description: "系统超级管理员", PermissionIDs: permissionIDs},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "数据管理员", Code: "data_admin", Description: "数据管理权限", PermissionIDs: permissionIDs[3:6]},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Name: "普通用户", Code: "user", Description: "普通用户权限", PermissionIDs: permissionIDs[3:4]},
 	}
 
 	for _, role := range roles {
@@ -115,10 +115,10 @@ func createUsers(s storage.Storage) {
 	}
 
 	users := []models.User{
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Username: "admin", Password: "liangminchuan", Email: "admin@datacenter.local", RoleIDs: roleIDs},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "dataadmin", Password: "liangminchuan", Email: "dataadmin@datacenter.local", RoleIDs: roleIDs[1:2]},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "user1", Password: "liangminchuan", Email: "user1@datacenter.local", RoleIDs: roleIDs[2:3]},
-		{BaseModel: models.BaseModel{ID: primitive.NewObjectID(), CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "user2", Password: "liangminchuan", Email: "user2@datacenter.local", RoleIDs: roleIDs[2:3]},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "system", CreatedAt: time.Now(), UpdatedBy: "system", UpdatedAt: time.Now()}, Username: "admin", Password: "liangminchuan", Email: "admin@datacenter.local", RoleIDs: roleIDs},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "dataadmin", Password: "liangminchuan", Email: "dataadmin@datacenter.local", RoleIDs: roleIDs[1:2]},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "user1", Password: "liangminchuan", Email: "user1@datacenter.local", RoleIDs: roleIDs[2:3]},
+		{ID: primitive.NewObjectID(), BaseModel: models.BaseModel{CreatedBy: "admin", CreatedAt: time.Now(), UpdatedBy: "admin", UpdatedAt: time.Now()}, Username: "user2", Password: "liangminchuan", Email: "user2@datacenter.local", RoleIDs: roleIDs[2:3]},
 	}
 
 	for _, user := range users {
@@ -143,8 +143,8 @@ func createCollections(s storage.Storage) {
 
 	for _, module := range modules {
 		collection := &models.Collection{
+			ID: primitive.NewObjectID(),
 			BaseModel: models.BaseModel{
-				ID:        primitive.NewObjectID(),
 				CreatedBy: "admin",
 				CreatedAt: time.Now(),
 				UpdatedBy: "admin",
@@ -180,8 +180,8 @@ func createScrapeData(s storage.Storage) {
 		for i := 0; i < 20; i++ {
 			// 创建刮削任务
 			task := &models.ScrapeTask{
+				ID: primitive.NewObjectID(),
 				BaseModel: models.BaseModel{
-					ID:        primitive.NewObjectID(),
 					CreatedBy: "admin",
 					CreatedAt: time.Now(),
 					UpdatedBy: "admin",
@@ -193,7 +193,7 @@ func createScrapeData(s storage.Storage) {
 				Status:      models.ScrapeTaskStatusSuccess,
 				Result: map[string]interface{}{
 					"items_scraped": 10,
-					"duration_ms":  1500,
+					"duration_ms":   1500,
 				},
 				ErrorMessage: "",
 			}
@@ -213,8 +213,8 @@ func createScrapeData(s storage.Storage) {
 
 			// 创建对应的业务数据
 			data := &models.BusinessData{
+				ID: primitive.NewObjectID(),
 				BaseModel: models.BaseModel{
-					ID:        primitive.NewObjectID(),
 					CreatedBy: "admin",
 					CreatedAt: time.Now(),
 					UpdatedBy: "admin",

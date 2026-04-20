@@ -30,8 +30,8 @@ func main() {
 			Description:    "测试上传模块",
 			DatatypeOwner:  "test",
 			CollectionName: module + "_data",
+			ID:             primitive.NewObjectID(),
 			BaseModel: models.BaseModel{
-				ID:        primitive.NewObjectID(),
 				CreatedBy: "test",
 				CreatedAt: time.Now(),
 				UpdatedBy: "test",
@@ -51,8 +51,8 @@ func main() {
 	// 创建测试数据
 	for i := 0; i < 15; i++ {
 		data := &models.BusinessData{
+			ID: primitive.NewObjectID(),
 			BaseModel: models.BaseModel{
-				ID:        primitive.NewObjectID(),
 				CreatedBy: "test",
 				CreatedAt: time.Now(),
 				UpdatedBy: "test",

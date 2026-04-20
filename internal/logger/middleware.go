@@ -1,14 +1,35 @@
 package logger
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
+type responseWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w responseWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
+func (w responseWriter) WriteString(s string) (int, error) {
+	w.body.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
+}
+
 func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
+
+		// 创建响应体捕获器
+		body := &bytes.Buffer{}
+		w := &responseWriter{ResponseWriter: c.Writer, body: body}
+		c.Writer = w
 
 		c.Next()
 
@@ -32,6 +53,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 			Dur("latency", latency).
 			Str("client_ip", c.ClientIP()).
 			Str("user_agent", c.Request.UserAgent()).
+			Str("response", body.String()).
 			Logger()
 
 		switch {

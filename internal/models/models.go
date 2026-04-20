@@ -7,11 +7,10 @@ import (
 )
 
 type BaseModel struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
-	CreatedBy string             `json:"created_by" bson:"created_by"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedBy string             `json:"updated_by" bson:"updated_by"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+	CreatedBy string    `json:"created_by" bson:"created_by"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedBy string    `json:"updated_by" bson:"updated_by"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 type FieldType string
@@ -24,6 +23,7 @@ const (
 )
 
 type FieldDefinition struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module      string      `json:"module" bson:"module"`
 	FieldName   string      `json:"field_name" bson:"field_name"`
@@ -41,6 +41,7 @@ type Constraints struct {
 }
 
 type BusinessData struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module       string                 `json:"module" bson:"module"`
 	Description  string                 `json:"description" bson:"description"`
@@ -49,6 +50,7 @@ type BusinessData struct {
 }
 
 type DeletedData struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module       string                 `json:"module" bson:"module"`
 	OriginalID   primitive.ObjectID     `json:"original_id" bson:"original_id"`
@@ -59,6 +61,7 @@ type DeletedData struct {
 }
 
 type User struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Username string   `json:"username" bson:"username"`
 	Password string   `json:"password,omitempty" bson:"password"`
@@ -67,6 +70,7 @@ type User struct {
 }
 
 type Permission struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Name        string `json:"name" bson:"name"`
 	Code        string `json:"code" bson:"code"`
@@ -74,6 +78,7 @@ type Permission struct {
 }
 
 type Role struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Name          string   `json:"name" bson:"name"`
 	Code          string   `json:"code" bson:"code"`
@@ -91,6 +96,7 @@ const (
 )
 
 type ScrapeTask struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module         string             `json:"module" bson:"module"`
 	DataPath       string             `json:"data_path" bson:"data_path"`
@@ -104,6 +110,7 @@ type ScrapeTask struct {
 }
 
 type DeletedScrapeTask struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module         string             `json:"module" bson:"module"`
 	OriginalID     primitive.ObjectID `json:"original_id" bson:"original_id"`
@@ -119,6 +126,7 @@ type DeletedScrapeTask struct {
 }
 
 type Collection struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 	BaseModel
 	Module         string `json:"module" bson:"module"`
 	Description    string `json:"description" bson:"description"`

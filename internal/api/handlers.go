@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"datacenter/internal/auth"
+	"datacenter/internal/logger"
 	"datacenter/internal/models"
 	"datacenter/internal/scraper"
 	"datacenter/internal/storage"
@@ -578,7 +579,9 @@ func (h *Handler) GetRoleByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
 		return
 	}
-	c.JSON(http.StatusOK, role)
+	c.JSON(http.StatusOK, gin.H{
+		"data": role,
+	})
 }
 
 func (h *Handler) CreateRole(c *gin.Context) {
@@ -606,7 +609,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, role)
+	c.JSON(http.StatusCreated, gin.H{"data": role})
 }
 
 func (h *Handler) UpdateRole(c *gin.Context) {
@@ -644,7 +647,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, role)
+	c.JSON(http.StatusOK, gin.H{"data": role})
 }
 
 func (h *Handler) DeleteRole(c *gin.Context) {
@@ -686,7 +689,7 @@ func (h *Handler) AssignPermissionToRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, role)
+	c.JSON(http.StatusOK, gin.H{"data": role})
 }
 
 func (h *Handler) RemovePermissionFromRole(c *gin.Context) {
@@ -712,7 +715,7 @@ func (h *Handler) RemovePermissionFromRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, role)
+	c.JSON(http.StatusOK, gin.H{"data": role})
 }
 
 func (h *Handler) GetRolePermissions(c *gin.Context) {
@@ -933,7 +936,7 @@ func (h *Handler) GetBusinessDataByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
 func (h *Handler) UpdateBusinessData(c *gin.Context) {
@@ -949,12 +952,14 @@ func (h *Handler) UpdateBusinessData(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	logger.Info("req is:%+v", req)
 
 	data, err := h.storage.GetBusinessDataByID(module, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Business data not found"})
 		return
 	}
+	logger.Error("data is %+v", data)
 
 	if req.Description != "" {
 		data.Description = req.Description
@@ -968,7 +973,7 @@ func (h *Handler) UpdateBusinessData(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
 func (h *Handler) DeleteBusinessData(c *gin.Context) {

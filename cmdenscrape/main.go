@@ -31,12 +31,12 @@ func main() {
 		module := modules[rand.Intn(len(modules))]
 		status := getRandomStatus()
 		task := createTestScrapeTask(module, status, i)
-		
+
 		if err := storage.CreateScrapeTask(task); err != nil {
 			fmt.Printf("创建刮削任务失败: %v\n", err)
 			continue
 		}
-		
+
 		fmt.Printf("创建刮削任务: %s - %s (状态: %s)\n", module, task.ID.Hex(), task.Status)
 	}
 
@@ -55,7 +55,7 @@ func getRandomStatus() models.ScrapeTaskStatus {
 func createTestScrapeTask(module string, status models.ScrapeTaskStatus, index int) *models.ScrapeTask {
 	now := time.Now()
 	startedAt := now.Add(-time.Duration(rand.Intn(72)) * time.Hour)
-	
+
 	var completedAt *time.Time
 	if status != models.ScrapeTaskStatusScraping {
 		completed := startedAt.Add(time.Duration(1+rand.Intn(24)) * time.Hour)
@@ -63,8 +63,8 @@ func createTestScrapeTask(module string, status models.ScrapeTaskStatus, index i
 	}
 
 	task := &models.ScrapeTask{
+		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
 			CreatedBy: "system",
 			CreatedAt: now,
 			UpdatedBy: "system",

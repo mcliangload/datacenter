@@ -10,6 +10,7 @@ import type {
 
 export interface RoleWithPermissions extends Role {
   permissions?: Permission[]
+  permission_codes?: string[]
   created_at?: string
   updated_at?: string
 }
@@ -23,11 +24,17 @@ export const roleService = {
       params: { page, pageSize }
     })
     
+    console.log('getRoles response:', response.data)
+    
     // 处理后端返回的字段映射
-    const mappedData = response.data.data.map((role: any) => ({
+    const mappedData = (response.data.data || []).map((role: any) => ({
       ...role,
-      id: role._id
+      id: role._id || role.id,
+      permission_ids: Array.isArray(role.permission_ids) ? role.permission_ids : [],
+      permission_codes: Array.isArray(role.permission_codes) ? role.permission_codes : []
     }))
+    
+    console.log('Mapped roles data:', mappedData)
     
     return {
       data: mappedData,
@@ -40,30 +47,67 @@ export const roleService = {
   async getRoleById(id: string): Promise<RoleWithPermissions> {
     const response = await apiClient.get<any>(`/api/roles/${id}`)
     
-    // 处理后端返回的字段映射
+    console.log('Response data:', response.data)
+    
+    if (!response.data) {
+      throw new Error('获取角色详情失败：响应数据为空')
+    }
+    
+    let roleData = response.data.data
+    if (!roleData) {
+      roleData = response.data
+    }
+    
+    if (!roleData) {
+      throw new Error('获取角色详情失败：数据为空')
+    }
+    
+    console.log('Role data:', roleData)
+    
+    const permissionIds = Array.isArray(roleData.permission_ids) ? roleData.permission_ids : []
+    const permissionCodes = Array.isArray(roleData.permission_codes) ? roleData.permission_codes : []
+    
     return {
-      ...response.data,
-      id: response.data._id
+      ...roleData,
+      id: roleData._id || roleData.id,
+      permission_ids: permissionIds,
+      permission_codes: permissionCodes
     }
   },
 
   async createRole(data: CreateRoleRequest): Promise<RoleWithPermissions> {
     const response = await apiClient.post<any>('/api/roles', data)
     
-    // 处理后端返回的字段映射
+    let roleData = response.data.data
+    if (!roleData) {
+      roleData = response.data
+    }
+    
+    if (!roleData) {
+      throw new Error('创建角色失败：响应数据为空')
+    }
+    
     return {
-      ...response.data,
-      id: response.data._id
+      ...roleData,
+      id: roleData._id || roleData.id
     }
   },
 
   async updateRole(id: string, data: UpdateRoleRequest): Promise<RoleWithPermissions> {
     const response = await apiClient.put<any>(`/api/roles/${id}`, data)
     
-    // 处理后端返回的字段映射
+    let roleData = response.data.data
+    if (!roleData) {
+      roleData = response.data
+    }
+    
+    if (!roleData) {
+      throw new Error('更新角色失败：响应数据为空')
+    }
+    
     return {
-      ...response.data,
-      id: response.data._id
+      ...roleData,
+      id: roleData._id || roleData.id
     }
   },
 

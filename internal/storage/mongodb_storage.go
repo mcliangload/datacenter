@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"datacenter/internal/logger"
 	"datacenter/internal/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -348,6 +349,7 @@ func (s *mongodbStorage) CreateBusinessData(ctx context.Context, data *models.Bu
 	collectionName := s.getCollectionName(data.Module)
 	coll := s.GetDynamicCollection(collectionName)
 
+	// 直接存储数据，确保BaseModel字段在根文档中
 	_, err := coll.InsertOne(context.Background(), data)
 	return err
 }
@@ -411,6 +413,7 @@ func (s *mongodbStorage) UpdateBusinessData(data *models.BusinessData) error {
 		bson.M{"_id": data.ID},
 		bson.M{"$set": data},
 	)
+	logger.Info("UpdateBusinessData :%+v", data)
 	return err
 }
 
@@ -472,8 +475,8 @@ func (s *mongodbStorage) DeleteBusinessData(id string, userID string) error {
 
 	// 创建删除记录
 	deletedRecord := &models.DeletedData{
+		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
 			CreatedBy: userID,
 			CreatedAt: time.Now(),
 			UpdatedBy: userID,
@@ -542,8 +545,8 @@ func (s *mongodbStorage) RecoverDeletedData(id string, userID string) error {
 
 	// 创建恢复的业务数据
 	recoveredData := &models.BusinessData{
+		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
 			CreatedBy: deletedRecord.CreatedBy,
 			CreatedAt: time.Now(),
 			UpdatedBy: userID,
@@ -667,8 +670,8 @@ func (s *mongodbStorage) DeleteScrapeTask(id string) error {
 	}
 
 	deletedTask := &models.DeletedScrapeTask{
+		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
-			ID:        primitive.NewObjectID(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -736,8 +739,8 @@ func (s *mongodbStorage) RecoverScrapeTask(id string) error {
 	}
 
 	recoveredTask := &models.ScrapeTask{
+		ID: deletedTask.OriginalID,
 		BaseModel: models.BaseModel{
-			ID:        deletedTask.OriginalID,
 			CreatedAt: deletedTask.CreatedAt,
 			UpdatedAt: time.Now(),
 		},
