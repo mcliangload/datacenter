@@ -15,6 +15,7 @@ import (
 	"datacenter/internal/logger"
 	"datacenter/internal/scraper"
 	"datacenter/internal/storage"
+	"datacenter/pkg/rbac"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -75,7 +76,10 @@ func main() {
 	)
 	fmt.Println("7. JWT服务初始化完成")
 
-	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem, jwtService)
+	rbacService := rbac.NewService(rbacStorage)
+	fmt.Println("7.5 RBAC服务初始化完成")
+
+	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem, jwtService, rbacService)
 	fmt.Println("8. API处理器初始化完成")
 
 	gin.SetMode(gin.ReleaseMode)

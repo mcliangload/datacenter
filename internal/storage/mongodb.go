@@ -30,7 +30,7 @@ type Storage interface {
 	DeleteFieldDefinition(id string) error
 
 	// 业务数据相关
-	CreateBusinessData(ctx context.Context, data *models.BusinessData) error
+	CreateBusinessData(ctx context.Context, collectionName string, data *models.BusinessData) error
 	GetBusinessDataByID(module, id string) (*models.BusinessData, error)
 	GetBusinessDataByModule(module string, filter bson.M, skip, limit int64) ([]models.BusinessData, error)
 	GetBusinessDataCount(module string, filter bson.M) (int64, error)
@@ -79,6 +79,7 @@ type Storage interface {
 	CreateCollection(collection *models.Collection) error
 	GetCollectionByModule(module string) (*models.Collection, error)
 	GetCollections(skip, limit int64) ([]models.Collection, error)
+	GetCollectionsCount() (int64, error)
 	UpdateCollection(collection *models.Collection) error
 	DeleteCollection(module string) error
 

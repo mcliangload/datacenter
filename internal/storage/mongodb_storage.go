@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"datacenter/internal/logger"
 	"datacenter/internal/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -49,11 +48,6 @@ func NewMongoDBStorage(uri, databaseName string) (Storage, error) {
 	}
 
 	return storage, nil
-}
-
-// getCollectionName 为模块名添加_data后缀生成集合名
-func (s *mongodbStorage) getCollectionName(module string) string {
-	return module + "_data"
 }
 
 func (s *mongodbStorage) GetDynamicCollection(collectionName string) *mongo.Collection {
@@ -137,7 +131,7 @@ func (s *mongodbStorage) DeleteUser(id string) error {
 }
 
 func (s *mongodbStorage) GetUsers(skip, limit int64) ([]models.User, error) {
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	opts := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"created_at": -1})
 	cursor, err := s.database.Collection("users").Find(context.Background(), bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -186,7 +180,7 @@ func (s *mongodbStorage) GetPermissionByCode(code string) (*models.Permission, e
 }
 
 func (s *mongodbStorage) GetPermissions(skip, limit int64) ([]models.Permission, error) {
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	opts := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"created_at": -1})
 	cursor, err := s.database.Collection("permissions").Find(context.Background(), bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -254,7 +248,7 @@ func (s *mongodbStorage) GetRoleByCode(code string) (*models.Role, error) {
 }
 
 func (s *mongodbStorage) GetRoles(skip, limit int64) ([]models.Role, error) {
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	opts := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"created_at": -1})
 	cursor, err := s.database.Collection("roles").Find(context.Background(), bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -341,15 +335,13 @@ func (s *mongodbStorage) DeleteFieldDefinition(id string) error {
 	return err
 }
 
-func (s *mongodbStorage) CreateBusinessData(ctx context.Context, data *models.BusinessData) error {
+func (s *mongodbStorage) CreateBusinessData(ctx context.Context, collectionName string, data *models.BusinessData) error {
 	data.ID = primitive.NewObjectID()
 	data.CreatedAt = time.Now()
 	data.UpdatedAt = time.Now()
 
-	collectionName := s.getCollectionName(data.Module)
 	coll := s.GetDynamicCollection(collectionName)
 
-	// 直接存储数据，确保BaseModel字段在根文档中
 	_, err := coll.InsertOne(context.Background(), data)
 	return err
 }
@@ -360,7 +352,7 @@ func (s *mongodbStorage) GetBusinessDataByID(module string, id string) (*models.
 		return nil, err
 	}
 
-	collectionName := s.getCollectionName(module)
+	collectionName := module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 
 	var data models.BusinessData
@@ -372,10 +364,10 @@ func (s *mongodbStorage) GetBusinessDataByID(module string, id string) (*models.
 }
 
 func (s *mongodbStorage) GetBusinessDataByModule(module string, filter bson.M, skip, limit int64) ([]models.BusinessData, error) {
-	collectionName := s.getCollectionName(module)
+	collectionName := module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	opts := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"updated_at": -1})
 	cursor, err := coll.Find(context.Background(), filter, opts)
 	if err != nil {
 		return nil, err
@@ -391,7 +383,7 @@ func (s *mongodbStorage) GetBusinessDataByModule(module string, filter bson.M, s
 }
 
 func (s *mongodbStorage) GetBusinessDataCount(module string, filter bson.M) (int64, error) {
-	collectionName := s.getCollectionName(module)
+	collectionName := module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 
 	count, err := coll.CountDocuments(context.Background(), filter)
@@ -405,7 +397,7 @@ func (s *mongodbStorage) GetBusinessDataCount(module string, filter bson.M) (int
 func (s *mongodbStorage) UpdateBusinessData(data *models.BusinessData) error {
 	data.UpdatedAt = time.Now()
 
-	collectionName := s.getCollectionName(data.Module)
+	collectionName := data.Module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 
 	_, err := coll.UpdateOne(
@@ -413,7 +405,6 @@ func (s *mongodbStorage) UpdateBusinessData(data *models.BusinessData) error {
 		bson.M{"_id": data.ID},
 		bson.M{"$set": data},
 	)
-	logger.Info("UpdateBusinessData :%+v", data)
 	return err
 }
 
@@ -475,7 +466,6 @@ func (s *mongodbStorage) DeleteBusinessData(id string, userID string) error {
 
 	// 创建删除记录
 	deletedRecord := &models.DeletedData{
-		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
 			CreatedBy: userID,
 			CreatedAt: time.Now(),
@@ -496,7 +486,7 @@ func (s *mongodbStorage) DeleteBusinessData(id string, userID string) error {
 	}
 
 	// 从原集合中删除数据
-	collectionName := s.getCollectionName(module)
+	collectionName := module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 	_, err = coll.DeleteOne(ctx, bson.M{"_id": objID})
 	return err
@@ -545,7 +535,6 @@ func (s *mongodbStorage) RecoverDeletedData(id string, userID string) error {
 
 	// 创建恢复的业务数据
 	recoveredData := &models.BusinessData{
-		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
 			CreatedBy: deletedRecord.CreatedBy,
 			CreatedAt: time.Now(),
@@ -558,7 +547,7 @@ func (s *mongodbStorage) RecoverDeletedData(id string, userID string) error {
 		FilePath:     deletedRecord.FilePath,
 	}
 
-	collectionName := s.getCollectionName(deletedRecord.Module)
+	collectionName := deletedRecord.Module + "_data"
 	coll := s.GetDynamicCollection(collectionName)
 
 	// 确保集合存在
@@ -670,7 +659,6 @@ func (s *mongodbStorage) DeleteScrapeTask(id string) error {
 	}
 
 	deletedTask := &models.DeletedScrapeTask{
-		ID: primitive.NewObjectID(),
 		BaseModel: models.BaseModel{
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -739,7 +727,6 @@ func (s *mongodbStorage) RecoverScrapeTask(id string) error {
 	}
 
 	recoveredTask := &models.ScrapeTask{
-		ID: deletedTask.OriginalID,
 		BaseModel: models.BaseModel{
 			CreatedAt: deletedTask.CreatedAt,
 			UpdatedAt: time.Now(),
@@ -789,7 +776,7 @@ func (s *mongodbStorage) GetCollectionByModule(module string) (*models.Collectio
 }
 
 func (s *mongodbStorage) GetCollections(skip, limit int64) ([]models.Collection, error) {
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	opts := options.Find().SetSkip(skip).SetLimit(limit).SetSort(bson.M{"created_at": -1})
 	cursor, err := s.collections.Find(context.Background(), bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -801,6 +788,10 @@ func (s *mongodbStorage) GetCollections(skip, limit int64) ([]models.Collection,
 		return nil, err
 	}
 	return collections, nil
+}
+
+func (s *mongodbStorage) GetCollectionsCount() (int64, error) {
+	return s.collections.CountDocuments(context.Background(), bson.M{})
 }
 
 func (s *mongodbStorage) UpdateCollection(collection *models.Collection) error {
@@ -819,7 +810,7 @@ func (s *mongodbStorage) DeleteCollection(module string) error {
 		return err
 	}
 
-	collectionName := s.getCollectionName(module)
+	collectionName := module + "_data"
 	delete(s.dynamicColls, collectionName)
 	return s.database.Collection(collectionName).Drop(context.Background())
 }

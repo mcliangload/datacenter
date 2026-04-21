@@ -89,8 +89,15 @@ const scraperService = {
     const response = await apiClient.post('/api/scraper/upload', {
       module: data.module,
       data_path: data.data_path,
-      scraper_path: data.scraper_path
+      scraper_path: data.scraper_path,
+      description: data.description || ''
     })
+    return response.data
+  },
+
+  // 批量删除刮削任务
+  batchDeleteScrapeTasks: async (ids: string[]): Promise<ApiResponse> => {
+    const response = await apiClient.post('/api/scraper/tasks/batch-delete', { ids })
     return response.data
   }
 }

@@ -2,133 +2,249 @@ package rbac
 
 import (
 	"context"
-	"time"
+	"strings"
 
-	"datacenter/internal/models"
 	"datacenter/internal/storage"
 )
 
-type Role string
-
 type Permission string
 
-type AuditLog struct {
-	ID        string    `json:"_id" bson:"_id"`
-	UserID    string    `json:"user_id" bson:"user_id"`
-	Action    string    `json:"action" bson:"action"`
-	Resource  string    `json:"resource" bson:"resource"`
-	Details   string    `json:"details" bson:"details"`
-	Timestamp time.Time `json:"timestamp" bson:"timestamp"`
-	IP        string    `json:"ip" bson:"ip"`
+const (
+	PermissionUserRead   Permission = "user:read"
+	PermissionUserWrite  Permission = "user:write"
+	PermissionUserManage Permission = "user:manage"
+
+	PermissionRoleRead   Permission = "role:read"
+	PermissionRoleWrite  Permission = "role:write"
+	PermissionRoleManage Permission = "role:manage"
+
+	PermissionPermissionRead   Permission = "permission:read"
+	PermissionPermissionWrite  Permission = "permission:write"
+	PermissionPermissionManage Permission = "permission:manage"
+
+	PermissionCollectionRead   Permission = "collection:read"
+	PermissionCollectionWrite  Permission = "collection:write"
+	PermissionCollectionManage Permission = "collection:manage"
+
+	PermissionFieldRead   Permission = "field:read"
+	PermissionFieldWrite  Permission = "field:write"
+	PermissionFieldManage Permission = "field:manage"
+
+	PermissionDataRead   Permission = "data:read"
+	PermissionDataWrite  Permission = "data:write"
+	PermissionDataManage Permission = "data:manage"
+
+	PermissionScrapeRead   Permission = "scrape:read"
+	PermissionScrapeWrite  Permission = "scrape:write"
+	PermissionScrapeManage Permission = "scrape:manage"
+
+	PermissionSystemAdmin Permission = "system:admin"
+)
+
+var PermissionAll = []Permission{
+	PermissionUserRead, PermissionUserWrite, PermissionUserManage,
+	PermissionRoleRead, PermissionRoleWrite, PermissionRoleManage,
+	PermissionPermissionRead, PermissionPermissionWrite, PermissionPermissionManage,
+	PermissionCollectionRead, PermissionCollectionWrite, PermissionCollectionManage,
+	PermissionFieldRead, PermissionFieldWrite, PermissionFieldManage,
+	PermissionDataRead, PermissionDataWrite, PermissionDataManage,
+	PermissionScrapeRead, PermissionScrapeWrite, PermissionScrapeManage,
+	PermissionSystemAdmin,
 }
 
 type Service struct {
 	storage storage.RBACStorage
 }
 
-func NewService(storage storage.RBACStorage) *Service {
-	return &Service{
-		storage: storage,
-	}
+func NewService(s storage.RBACStorage) *Service {
+	return &Service{storage: s}
 }
 
-func (s *Service) CheckPermission(ctx context.Context, roles []string, permission Permission) (bool, error) {
-	for _, roleCode := range roles {
-		role, err := s.storage.GetRoleByCode(roleCode)
+func (s *Service) CheckPermission(ctx context.Context, userID string, requiredPermission Permission) (bool, error) {
+	user, err := s.storage.GetUserByID(userID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(user.RoleIDs) == 0 {
+		return false, nil
+	}
+
+	if requiredPermission == PermissionSystemAdmin {
+		return false, nil
+	}
+
+	for _, roleID := range user.RoleIDs {
+		role, err := s.storage.GetRoleByID(roleID)
 		if err != nil {
 			continue
 		}
 
-		permissions, err := s.storage.GetRolePermissions(role.ID.Hex())
-		if err != nil {
+		if len(role.PermissionIDs) == 0 {
 			continue
 		}
 
-		for _, perm := range permissions {
-			if perm.Code == string(permission) {
+		for _, permID := range role.PermissionIDs {
+			perm, err := s.storage.GetPermissionByID(permID)
+			if err != nil {
+				continue
+			}
+
+			if s.matchPermission(perm.Code, string(requiredPermission)) {
 				return true, nil
 			}
+		}
+	}
+
+	return false, nil
+}
+
+func (s *Service) matchPermission(userPermCode, requiredPermCode string) bool {
+	if userPermCode == requiredPermCode {
+		return true
+	}
+
+	if strings.HasSuffix(userPermCode, ":*") {
+		prefix := strings.TrimSuffix(userPermCode, "*")
+		if strings.HasPrefix(requiredPermCode, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Service) GetUserPermissions(ctx context.Context, userID string) ([]string, error) {
+	user, err := s.storage.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	permMap := make(map[string]bool)
+
+	for _, roleID := range user.RoleIDs {
+		role, err := s.storage.GetRoleByID(roleID)
+		if err != nil {
+			continue
+		}
+
+		for _, permID := range role.PermissionIDs {
+			perm, err := s.storage.GetPermissionByID(permID)
+			if err != nil {
+				continue
+			}
+			permMap[perm.Code] = true
+		}
+	}
+
+	perms := make([]string, 0, len(permMap))
+	for p := range permMap {
+		perms = append(perms, p)
+	}
+
+	return perms, nil
+}
+
+func (s *Service) HasAnyPermission(ctx context.Context, userID string, requiredPermissions []Permission) (bool, error) {
+	for _, perm := range requiredPermissions {
+		has, err := s.CheckPermission(ctx, userID, perm)
+		if err != nil {
+			return false, err
+		}
+		if has {
+			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func (s *Service) GetUserPermissions(ctx context.Context, roles []string) ([]Permission, error) {
-	permissionMap := make(map[string]bool)
-
-	for _, roleCode := range roles {
-		role, err := s.storage.GetRoleByCode(roleCode)
+func (s *Service) HasAllPermissions(ctx context.Context, userID string, requiredPermissions []Permission) (bool, error) {
+	for _, perm := range requiredPermissions {
+		has, err := s.CheckPermission(ctx, userID, perm)
 		if err != nil {
-			continue
+			return false, err
 		}
-
-		permissions, err := s.storage.GetRolePermissions(role.ID.Hex())
-		if err != nil {
-			continue
-		}
-
-		for _, perm := range permissions {
-			permissionMap[perm.Code] = true
+		if !has {
+			return false, nil
 		}
 	}
+	return true, nil
+}
 
-	permissions := make([]Permission, 0, len(permissionMap))
-	for p := range permissionMap {
-		permissions = append(permissions, Permission(p))
+func GetAPIPermission(method, path string) Permission {
+	path = strings.TrimPrefix(path, "/api/")
+
+	if strings.HasPrefix(path, "users") {
+		switch method {
+		case "GET":
+			return PermissionUserRead
+		case "POST", "PUT", "DELETE":
+			return PermissionUserWrite
+		}
 	}
 
-	return permissions, nil
-}
-
-func (s *Service) GetPermissionsByRoleCode(ctx context.Context, roleCode string) ([]Permission, error) {
-	role, err := s.storage.GetRoleByCode(roleCode)
-	if err != nil {
-		return nil, err
+	if strings.HasPrefix(path, "roles") {
+		switch method {
+		case "GET":
+			return PermissionRoleRead
+		case "POST", "PUT", "DELETE":
+			return PermissionRoleWrite
+		}
 	}
 
-	permissions, err := s.storage.GetRolePermissions(role.ID.Hex())
-	if err != nil {
-		return nil, err
+	if strings.HasPrefix(path, "permissions") {
+		switch method {
+		case "GET":
+			return PermissionPermissionRead
+		case "POST", "PUT", "DELETE":
+			return PermissionPermissionWrite
+		}
 	}
 
-	result := make([]Permission, len(permissions))
-	for i, perm := range permissions {
-		result[i] = Permission(perm.Code)
+	if strings.HasPrefix(path, "collections") {
+		switch method {
+		case "GET":
+			return PermissionCollectionRead
+		case "POST", "PUT", "DELETE":
+			return PermissionCollectionWrite
+		}
 	}
 
-	return result, nil
-}
+	if strings.HasPrefix(path, "fields") {
+		switch method {
+		case "GET":
+			return PermissionFieldRead
+		case "POST", "PUT", "DELETE":
+			return PermissionFieldWrite
+		}
+	}
 
-func (s *Service) GetUserRoles(ctx context.Context, userID string) ([]models.Role, error) {
-	return s.storage.GetUserRoles(userID)
-}
+	if strings.HasPrefix(path, "business") {
+		switch method {
+		case "GET":
+			return PermissionDataRead
+		case "POST", "PUT", "DELETE":
+			return PermissionDataWrite
+		}
+	}
 
-func (s *Service) IsValidRole(ctx context.Context, roleCode string) (bool, error) {
-	_, err := s.storage.GetRoleByCode(roleCode)
-	return err == nil, nil
-}
+	if strings.HasPrefix(path, "scraper") || strings.HasPrefix(path, "deleted-scraper") {
+		switch method {
+		case "GET":
+			return PermissionScrapeRead
+		case "POST", "PUT", "DELETE":
+			return PermissionScrapeWrite
+		}
+	}
 
-func (s *Service) IsValidPermission(ctx context.Context, permissionCode string) (bool, error) {
-	_, err := s.storage.GetPermissionByCode(permissionCode)
-	return err == nil, nil
-}
+	if strings.HasPrefix(path, "deleted") && !strings.HasPrefix(path, "deleted-scraper") {
+		switch method {
+		case "GET":
+			return PermissionDataRead
+		case "POST":
+			return PermissionDataWrite
+		}
+	}
 
-func CheckPermission(roles []string, permission Permission) bool {
-	return false
-}
-
-func GetUserPermissions(roles []string) []Permission {
-	return nil
-}
-
-func GetPermissionsByRoleCode(roleCode string) []Permission {
-	return nil
-}
-
-func IsValidRole(roleCode string) bool {
-	return false
-}
-
-func IsValidPermission(permissionCode string) bool {
-	return false
+	return PermissionSystemAdmin
 }

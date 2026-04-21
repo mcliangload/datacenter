@@ -1,6 +1,6 @@
-import { Button, Input, Space, Table, Modal, Form, message, Select, Tabs } from 'antd'
+import { Button, Input, Space, Table, Modal, Form, message, Select, Popconfirm } from 'antd'
 import { useState, useCallback, useEffect } from 'react'
-import { SearchOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RollbackOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, RetweetOutlined, RollbackOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import scraperService, { type ScrapeTask, type ScrapeTaskResponse } from '../../services/scraper'
 import apiClient from '../../services/api'
 
@@ -18,51 +18,55 @@ const ScraperCenter: React.FC = () => {
   const [retryModalVisible, setRetryModalVisible] = useState(false)
   const [retryTaskId, setRetryTaskId] = useState('')
   const [retryForm] = Form.useForm()
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [scraperPaths, setScraperPaths] = useState<{ value: string; label: string }[]>([])
 
   const fetchData = useCallback(async (page: number, pageSize: number, searchKeyword: string) => {
     setLoading(true)
     try {
       const skip = (page - 1) * pageSize
-      console.log('开始调用getScrapeTasks接口', { page, skip, limit: pageSize, keyword: searchKeyword })
       const response: ScrapeTaskResponse = await scraperService.getScrapeTasks({
         skip,
         limit: pageSize,
         keyword: searchKeyword
       })
-      console.log('getScrapeTasks接口响应', response)
       if (response && Array.isArray(response.data)) {
-        console.log('数据有效，设置数据', response.data)
         setData(response.data)
         setPagination(prev => ({ ...prev, total: response.total || 0, current: page, pageSize }))
-      } else {
-        console.error('响应数据结构不正确', response)
-        message.error('响应数据结构不正确')
       }
     } catch (error: any) {
-      console.error('搜索失败', error)
-      console.error('错误详情', error.response)
-      message.error(error?.response?.data?.error || '搜索失败')
+      message.error(error?.response?.data?.error || '获取数据失败')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // 获取模块列表
   const fetchModules = useCallback(async () => {
     try {
       const response = await apiClient.get('/api/collections')
       const moduleList = response.data.data || []
-      const moduleOptions = moduleList.map((module: any) => ({
-        value: module.module,
-        label: module.module
+      const moduleOptions = moduleList.map((m: any) => ({
+        value: m.module,
+        label: `${m.module} - ${m.description || ''}`
       }))
       setModules(moduleOptions)
+
+      const pathSet = new Set<string>()
+      moduleList.forEach((m: any) => {
+        if (m.collection_name) {
+          pathSet.add(`/scrapers/${m.module}_scraper.py`)
+        }
+      })
+      const pathOptions = Array.from(pathSet).map(p => ({
+        value: p,
+        label: p
+      }))
+      setScraperPaths(pathOptions)
     } catch (error: any) {
       console.error('获取模块列表失败', error)
     }
   }, [])
 
-  // 获取删除的刮削任务列表
   const fetchDeletedData = useCallback(async (page: number, pageSize: number, searchKeyword: string) => {
     setLoading(true)
     try {
@@ -76,8 +80,7 @@ const ScraperCenter: React.FC = () => {
       setDeletedData(response.data || [])
       setDeletedPagination(prev => ({ ...prev, total: response.total || 0, current: page, pageSize }))
     } catch (error: any) {
-      console.error('获取已删除任务失败', error)
-      message.error(error?.response?.data?.error || '获取已删除任务失败')
+      message.error(error?.response?.data?.error || '获取已删除数据失败')
     } finally {
       setLoading(false)
     }
@@ -107,6 +110,7 @@ const ScraperCenter: React.FC = () => {
     setKeyword('')
     setData([])
     setDeletedData([])
+    setSelectedRowKeys([])
   }
 
   const handleCreateData = async (values: any) => {
@@ -118,7 +122,6 @@ const ScraperCenter: React.FC = () => {
       form.resetFields()
       handleSearch()
     } catch (error: any) {
-      console.error('创建数据失败', error)
       message.error(error?.response?.data?.error || '创建数据失败')
     } finally {
       setLoading(false)
@@ -143,7 +146,6 @@ const ScraperCenter: React.FC = () => {
       retryForm.resetFields()
       handleSearch()
     } catch (error: any) {
-      console.error('重试失败', error)
       message.error(error?.response?.data?.error || '重试失败')
     } finally {
       setLoading(false)
@@ -157,19 +159,45 @@ const ScraperCenter: React.FC = () => {
       message.success(`恢复数据 ${id} 成功`)
       handleSearch()
     } catch (error: any) {
-      console.error('恢复失败', error)
       message.error(error?.response?.data?.error || '恢复失败')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要删除的数据')
+      return
+    }
+    setLoading(true)
+    try {
+      const result = await scraperService.batchDeleteScrapeTasks(selectedRowKeys as string[])
+      message.success(`成功删除 ${selectedRowKeys.length} 条数据`)
+      setSelectedRowKeys([])
+      handleSearch()
+    } catch (error: any) {
+      message.error(error?.response?.data?.error || '批量删除失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTableChange = (pagination: any) => {
     if (activeTab === 'data') {
       fetchData(pagination.current, pagination.pageSize, keyword)
     } else {
       fetchDeletedData(pagination.current, pagination.pageSize, keyword)
     }
+  }
+
+  const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
+    setSelectedRowKeys(newSelectedRowKeys)
+  }
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: onSelectChange
   }
 
   const dataColumns = [
@@ -303,19 +331,41 @@ const ScraperCenter: React.FC = () => {
           清除
         </Button>
       </Space>
+
+      {activeTab === 'data' && (
+        <Space style={{ marginBottom: '16px' }}>
+          <Popconfirm
+            title={`确定要删除选中的 ${selectedRowKeys.length} 条数据吗？`}
+            onConfirm={handleBatchDelete}
+            okText="确定"
+            cancelText="取消"
+            disabled={selectedRowKeys.length === 0}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              disabled={selectedRowKeys.length === 0}
+              loading={loading}
+            >
+              批量删除 {selectedRowKeys.length > 0 ? `(${selectedRowKeys.length})` : ''}
+            </Button>
+          </Popconfirm>
+        </Space>
+      )}
+
       <Table
-        columns={dataColumns}
-        dataSource={data}
+        columns={activeTab === 'data' ? dataColumns : deletedColumns}
+        dataSource={activeTab === 'data' ? data : deletedData}
         loading={loading}
         rowKey="_id"
-        rowSelection={{}}
+        rowSelection={rowSelection}
         pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
+          current: activeTab === 'data' ? pagination.current : deletedPagination.current,
+          pageSize: activeTab === 'data' ? pagination.pageSize : deletedPagination.pageSize,
           pageSizeOptions: ['10', '20', '50', '100'],
           showSizeChanger: true,
           showTotal: (total) => `共 ${total} 条记录`,
-          total: pagination.total
+          total: activeTab === 'data' ? pagination.total : deletedPagination.total
         }}
         onChange={handleTableChange}
       />
@@ -340,27 +390,64 @@ const ScraperCenter: React.FC = () => {
             <Select
               placeholder="选择模块"
               options={modules}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
             />
           </Form.Item>
           <Form.Item
             name="data_path"
             label="数据路径"
             rules={[{ required: true, message: '请输入数据路径' }]}
+            tooltip="数据文件所在的目录路径，如：/data/movie"
           >
-            <Input placeholder="请输入数据路径，例如：/data/book" />
+            <Input placeholder="请输入数据路径，例如：/data/movie" addonBefore="/" />
           </Form.Item>
           <Form.Item
             name="scraper_path"
             label="刮削器路径"
             rules={[{ required: true, message: '请输入刮削器路径' }]}
+            tooltip="刮削器脚本的路径，如：/scrapers/movie_scraper.py"
           >
-            <Input placeholder="请输入刮削器路径，例如：/scrapers/book_scraper.py" />
+            <Select
+              placeholder="选择或输入刮削器路径"
+              options={scraperPaths}
+              showSearch
+              allowClear
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              dropdownRender={(menu) => (
+                <>
+                  {menu}
+                  <div style={{ padding: '8px', borderTop: '1px solid #e8e8e8' }}>
+                    <Input
+                      placeholder="或直接输入路径"
+                      onPressEnter={(e) => {
+                        const value = (e.target as HTMLInputElement).value
+                        if (value) {
+                          form.setFieldValue('scraper_path', '/' + value.replace(/^\/+/, ''))
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value
+                        if (value && !value.startsWith('/')) {
+                          form.setFieldValue('scraper_path', '/' + value)
+                        }
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            />
           </Form.Item>
           <Form.Item
             name="description"
             label="描述"
+            tooltip="可选，描述此刮削任务的用途"
           >
-            <Input.TextArea rows={4} placeholder="请输入描述" />
+            <Input.TextArea rows={3} placeholder="请输入描述（可选）" />
           </Form.Item>
           <Form.Item>
             <Space style={{ justifyContent: 'flex-end' }}>
@@ -406,7 +493,6 @@ const ScraperCenter: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-
     </div>
   )
 }

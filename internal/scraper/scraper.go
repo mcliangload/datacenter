@@ -232,20 +232,32 @@ func (s *scraper) executeScraper(scraperPath, dataPath string) (map[string]inter
 
 // saveScrapedData 存储刮削结果，返回业务数据ID
 func (s *scraper) saveScrapedData(task *models.ScrapeTask, data map[string]interface{}) (primitive.ObjectID, error) {
-	// 增强数据结构，添加路径信息
 	enhancedData := make(map[string]interface{})
 	for k, v := range data {
 		enhancedData[k] = v
 	}
 
-	// 添加路径信息
 	enhancedData["scrape_path"] = task.ScraperPath
 	enhancedData["data_path"] = task.DataPath
 	enhancedData["module"] = task.Module
 	enhancedData["task_id"] = task.ID.Hex()
 	enhancedData["scraped_at"] = time.Now()
 
-	// 创建业务数据
+	fieldDefs, err := s.storage.GetFieldDefinitionsByModule(task.Module)
+	if err == nil && len(fieldDefs) > 0 {
+		for _, fieldDef := range fieldDefs {
+			value := enhancedData[fieldDef.FieldName]
+			result := fieldDef.Validate(value)
+			if !result.Valid {
+				log.Warn().
+					Str("task_id", task.ID.Hex()).
+					Str("field", fieldDef.FieldName).
+					Interface("errors", result.Errors).
+					Msg("刮削结果字段验证失败，将使用原始值保存")
+			}
+		}
+	}
+
 	businessData := &models.BusinessData{
 		Module:       task.Module,
 		Description:  fmt.Sprintf("刮削数据 - %s", task.DataPath),
@@ -259,8 +271,8 @@ func (s *scraper) saveScrapedData(task *models.ScrapeTask, data map[string]inter
 		},
 	}
 
-	// 保存到动态集合
-	err := s.storage.CreateBusinessData(context.Background(), businessData)
+	collectionName := task.Module + "_data"
+	err = s.storage.CreateBusinessData(context.Background(), collectionName, businessData)
 	if err != nil {
 		return primitive.NilObjectID, fmt.Errorf("存储业务数据失败: %v", err)
 	}

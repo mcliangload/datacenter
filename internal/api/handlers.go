@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"datacenter/internal/auth"
-	"datacenter/internal/logger"
 	"datacenter/internal/models"
 	"datacenter/internal/scraper"
 	"datacenter/internal/storage"
 	"datacenter/pkg/jql"
+	"datacenter/pkg/rbac"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -24,14 +25,16 @@ type Handler struct {
 	rbacStorage storage.RBACStorage
 	scraper     scraper.Scraper
 	jwtService  auth.JWTService
+	rbacService *rbac.Service
 }
 
-func NewHandler(storage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper, jwtService auth.JWTService) *Handler {
+func NewHandler(storage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper, jwtService auth.JWTService, rbacService *rbac.Service) *Handler {
 	return &Handler{
 		storage:     storage,
 		rbacStorage: rbacStorage,
 		scraper:     scraper,
 		jwtService:  jwtService,
+		rbacService: rbacService,
 	}
 }
 
@@ -43,89 +46,99 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	protected.Use(h.AuthMiddleware())
 	{
 		users := protected.Group("/users")
+		users.Use(h.PermissionMiddleware(rbac.PermissionUserRead))
 		{
 			users.GET("", h.GetUsers)
 			users.GET("/:id", h.GetUserByID)
-			users.POST("", h.CreateUser)
-			users.PUT("/:id", h.UpdateUser)
-			users.DELETE("/:id", h.DeleteUser)
-			users.POST("/:id/roles", h.AssignRoleToUser)
-			users.DELETE("/:id/roles/:roleId", h.RemoveRoleFromUser)
+			users.POST("", h.CreateUser).Use(h.PermissionMiddleware(rbac.PermissionUserWrite))
+			users.PUT("/:id", h.UpdateUser).Use(h.PermissionMiddleware(rbac.PermissionUserWrite))
+			users.DELETE("/:id", h.DeleteUser).Use(h.PermissionMiddleware(rbac.PermissionUserWrite))
+			users.POST("/:id/roles", h.AssignRoleToUser).Use(h.PermissionMiddleware(rbac.PermissionUserWrite))
+			users.DELETE("/:id/roles/:roleId", h.RemoveRoleFromUser).Use(h.PermissionMiddleware(rbac.PermissionUserWrite))
 			users.GET("/:id/roles", h.GetUserRoles)
 		}
 
 		permissions := protected.Group("/permissions")
+		permissions.Use(h.PermissionMiddleware(rbac.PermissionPermissionRead))
 		{
 			permissions.GET("", h.GetPermissions)
 			permissions.GET("/:id", h.GetPermissionByID)
-			permissions.POST("", h.CreatePermission)
-			permissions.PUT("/:id", h.UpdatePermission)
-			permissions.DELETE("/:id", h.DeletePermission)
+			permissions.POST("", h.CreatePermission).Use(h.PermissionMiddleware(rbac.PermissionPermissionWrite))
+			permissions.PUT("/:id", h.UpdatePermission).Use(h.PermissionMiddleware(rbac.PermissionPermissionWrite))
+			permissions.DELETE("/:id", h.DeletePermission).Use(h.PermissionMiddleware(rbac.PermissionPermissionWrite))
 		}
 
 		roles := protected.Group("/roles")
+		roles.Use(h.PermissionMiddleware(rbac.PermissionRoleRead))
 		{
 			roles.GET("", h.GetRoles)
 			roles.GET("/:id", h.GetRoleByID)
-			roles.POST("", h.CreateRole)
-			roles.PUT("/:id", h.UpdateRole)
-			roles.DELETE("/:id", h.DeleteRole)
-			roles.POST("/:id/permissions", h.AssignPermissionToRole)
-			roles.DELETE("/:id/permissions/:permissionId", h.RemovePermissionFromRole)
+			roles.POST("", h.CreateRole).Use(h.PermissionMiddleware(rbac.PermissionRoleWrite))
+			roles.PUT("/:id", h.UpdateRole).Use(h.PermissionMiddleware(rbac.PermissionRoleWrite))
+			roles.DELETE("/:id", h.DeleteRole).Use(h.PermissionMiddleware(rbac.PermissionRoleWrite))
+			roles.POST("/:id/permissions", h.AssignPermissionToRole).Use(h.PermissionMiddleware(rbac.PermissionRoleWrite))
+			roles.DELETE("/:id/permissions/:permissionId", h.RemovePermissionFromRole).Use(h.PermissionMiddleware(rbac.PermissionRoleWrite))
 			roles.GET("/:id/permissions", h.GetRolePermissions)
 		}
 
 		fields := protected.Group("/fields")
+		fields.Use(h.PermissionMiddleware(rbac.PermissionFieldRead))
 		{
 			fields.GET("/module/:module", h.GetFieldDefinitionsByModule)
 			fields.GET("/:id", h.GetFieldDefinitionByID)
-			fields.POST("", h.CreateFieldDefinition)
-			fields.PUT("/:id", h.UpdateFieldDefinition)
-			fields.DELETE("/:id", h.DeleteFieldDefinition)
+			fields.POST("", h.CreateFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
+			fields.PUT("/:id", h.UpdateFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
+			fields.DELETE("/:id", h.DeleteFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
 		}
 
 		business := protected.Group("/business")
+		business.Use(h.PermissionMiddleware(rbac.PermissionDataRead))
 		{
-			business.POST("", h.CreateBusinessData)
+			business.POST("", h.CreateBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
 			business.GET("/module/:module", h.GetBusinessDataByModule)
 			business.GET("/module/:module/:id", h.GetBusinessDataByID)
-			business.PUT("/module/:module/:id", h.UpdateBusinessData)
-			business.DELETE("/module/:module/:id", h.DeleteBusinessData)
+			business.PUT("/module/:module/:id", h.UpdateBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
+			business.DELETE("/module/:module/:id", h.DeleteBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
 		}
 
 		deleted := protected.Group("/deleted")
+		deleted.Use(h.PermissionMiddleware(rbac.PermissionDataRead))
 		{
 			deleted.GET("/module/:module", h.GetDeletedDataByModule)
 			deleted.GET("/:id", h.GetDeletedDataByID)
-			deleted.POST("/:id/recover", h.RecoverDeletedData)
+			deleted.POST("/:id/recover", h.RecoverDeletedData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
 		}
 
 		scraperGroup := protected.Group("/scraper")
+		scraperGroup.Use(h.PermissionMiddleware(rbac.PermissionScrapeRead))
 		{
-			scraperGroup.POST("/upload", h.SubmitScrapeTask)
+			scraperGroup.POST("/upload", h.SubmitScrapeTask).Use(h.PermissionMiddleware(rbac.PermissionScrapeWrite))
 			scraperGroup.GET("/tasks", h.GetScrapeTasks)
 			scraperGroup.GET("/tasks/:id", h.GetScrapeTaskByID)
-			scraperGroup.POST("/tasks/:id/retry", h.RetryScrapeTask)
-			scraperGroup.DELETE("/tasks/:id", h.DeleteScrapeTask)
+			scraperGroup.POST("/tasks/:id/retry", h.RetryScrapeTask).Use(h.PermissionMiddleware(rbac.PermissionScrapeWrite))
+			scraperGroup.DELETE("/tasks/:id", h.DeleteScrapeTask).Use(h.PermissionMiddleware(rbac.PermissionScrapeWrite))
+			scraperGroup.POST("/tasks/batch-delete", h.BatchDeleteScrapeTasks).Use(h.PermissionMiddleware(rbac.PermissionScrapeWrite))
 		}
 
 		deletedScraper := protected.Group("/deleted-scraper")
+		deletedScraper.Use(h.PermissionMiddleware(rbac.PermissionScrapeRead))
 		{
 			deletedScraper.GET("/module/:module", h.GetDeletedScrapeTasksByModule)
 			deletedScraper.GET("/:id", h.GetDeletedScrapeTaskByID)
-			deletedScraper.POST("/:id/recover", h.RecoverScrapeTask)
+			deletedScraper.POST("/:id/recover", h.RecoverScrapeTask).Use(h.PermissionMiddleware(rbac.PermissionScrapeWrite))
 		}
 
 		collections := protected.Group("/collections")
+		collections.Use(h.PermissionMiddleware(rbac.PermissionCollectionRead))
 		{
 			collections.GET("", h.GetCollections)
 			collections.GET("/:module", h.GetCollectionByModule)
-			collections.POST("", h.CreateCollection)
-			collections.PUT("/:module", h.UpdateCollection)
-			collections.DELETE("/:module", h.DeleteCollection)
-			collections.POST("/:module/indexes", h.CreateCollectionIndex)
+			collections.POST("", h.CreateCollection).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+			collections.PUT("/:module", h.UpdateCollection).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+			collections.DELETE("/:module", h.DeleteCollection).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+			collections.POST("/:module/indexes", h.CreateCollectionIndex).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
 			collections.GET("/:module/indexes", h.GetCollectionIndexes)
-			collections.DELETE("/:module/indexes/:name", h.DeleteCollectionIndex)
+			collections.DELETE("/:module/indexes/:name", h.DeleteCollectionIndex).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
 		}
 	}
 }
@@ -152,7 +165,8 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.jwtService.GenerateToken(user.ID.Hex(), user.RoleIDs, []string{})
+	perms, _ := h.rbacService.GetUserPermissions(context.Background(), user.ID.Hex())
+	token, err := h.jwtService.GenerateToken(user.ID.Hex(), user.RoleIDs, perms)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -232,7 +246,41 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("roles", claims.Roles)
 
+		perms, err := h.rbacService.GetUserPermissions(context.Background(), claims.UserID)
+		if err == nil {
+			c.Set("permissions", perms)
+		}
+
 		c.Next()
+	}
+}
+
+func (h *Handler) PermissionMiddleware(requiredPerm rbac.Permission) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		perms, exists := c.Get("permissions")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No permissions found"})
+			c.Abort()
+			return
+		}
+
+		permList, ok := perms.([]string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid permissions format"})
+			c.Abort()
+			return
+		}
+
+		required := string(requiredPerm)
+		for _, p := range permList {
+			if p == required || (strings.HasSuffix(p, ":*") && strings.HasPrefix(required, strings.TrimSuffix(p, "*"))) {
+				c.Next()
+				return
+			}
+		}
+
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied: " + required})
+		c.Abort()
 	}
 }
 
@@ -579,9 +627,7 @@ func (h *Handler) GetRoleByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"data": role,
-	})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) CreateRole(c *gin.Context) {
@@ -609,7 +655,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"data": role})
+	c.JSON(http.StatusCreated, role)
 }
 
 func (h *Handler) UpdateRole(c *gin.Context) {
@@ -647,7 +693,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": role})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) DeleteRole(c *gin.Context) {
@@ -689,7 +735,7 @@ func (h *Handler) AssignPermissionToRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": role})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) RemovePermissionFromRole(c *gin.Context) {
@@ -715,7 +761,7 @@ func (h *Handler) RemovePermissionFromRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": role})
+	c.JSON(http.StatusOK, role)
 }
 
 func (h *Handler) GetRolePermissions(c *gin.Context) {
@@ -745,9 +791,7 @@ func (h *Handler) GetFieldDefinitionsByModule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"data": fields,
-	})
+	c.JSON(http.StatusOK, gin.H{"data": fields})
 }
 
 func (h *Handler) GetFieldDefinitionByID(c *gin.Context) {
@@ -779,9 +823,7 @@ func (h *Handler) CreateFieldDefinition(c *gin.Context) {
 		FieldName:   req.FieldName,
 		FieldType:   models.FieldType(req.FieldType),
 		Description: req.Description,
-	}
-	if req.Constraints != nil {
-		field.Constraints = *req.Constraints
+		Constraints: *req.Constraints,
 	}
 
 	if err := h.storage.CreateFieldDefinition(field); err != nil {
@@ -846,8 +888,7 @@ func (h *Handler) DeleteFieldDefinition(c *gin.Context) {
 func (h *Handler) CreateBusinessData(c *gin.Context) {
 	var req struct {
 		Module       string                 `json:"module" binding:"required"`
-		DataPath     string                 `json:"data_path" binding:"required"`
-		ScraperPath  string                 `json:"scraper_path" binding:"required"`
+		Data         map[string]interface{} `json:"data"`
 		Description  string                 `json:"description"`
 		CustomFields map[string]interface{} `json:"custom_fields"`
 	}
@@ -857,36 +898,61 @@ func (h *Handler) CreateBusinessData(c *gin.Context) {
 		return
 	}
 
-	_, err := h.storage.GetCollectionByModule(req.Module)
+	collection, err := h.storage.GetCollectionByModule(req.Module)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("模块不存在: %s，请先创建模块集合", req.Module)})
 		return
 	}
 
-	task := &models.ScrapeTask{
-		Module:      req.Module,
-		DataPath:    req.DataPath,
-		ScraperPath: req.ScraperPath,
-		Status:      models.ScrapeTaskStatusPending,
+	fieldDefs, err := h.storage.GetFieldDefinitionsByModule(req.Module)
+	if err == nil && len(fieldDefs) > 0 {
+		for _, fieldDef := range fieldDefs {
+			value := req.Data[fieldDef.FieldName]
+			result := fieldDef.Validate(value)
+			if !result.Valid {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":  "字段验证失败",
+					"errors": result.Errors,
+					"module": req.Module,
+					"field":  fieldDef.FieldName,
+				})
+				return
+			}
+		}
 	}
 
 	userID, _ := c.Get("user_id")
+	userIDStr := "unknown"
 	if userID != nil {
-		task.CreatedBy = userID.(string)
-	} else {
-		task.CreatedBy = "unknown"
+		userIDStr = userID.(string)
 	}
 
-	if err := h.scraper.SubmitTask(task); err != nil {
+	data := &models.BusinessData{
+		Module:       req.Module,
+		Description:  req.Description,
+		CustomFields: req.CustomFields,
+		BaseModel: models.BaseModel{
+			CreatedBy: userIDStr,
+			CreatedAt: time.Now(),
+			UpdatedBy: userIDStr,
+			UpdatedAt: time.Now(),
+		},
+	}
+
+	if req.Data != nil {
+		data.CustomFields = req.Data
+	}
+
+	ctx := context.Background()
+	if err := h.storage.CreateBusinessData(ctx, collection.CollectionName, data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":   "数据上传成功，刮削任务已开始",
-		"task_id":   task.ID,
-		"module":    req.Module,
-		"data_path": req.DataPath,
+		"message": "数据创建成功",
+		"data":    data,
+		"module":  req.Module,
 	})
 }
 
@@ -936,7 +1002,7 @@ func (h *Handler) GetBusinessDataByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, data)
 }
 
 func (h *Handler) UpdateBusinessData(c *gin.Context) {
@@ -945,6 +1011,7 @@ func (h *Handler) UpdateBusinessData(c *gin.Context) {
 
 	var req struct {
 		Description  string                 `json:"description"`
+		Data         map[string]interface{} `json:"data"`
 		CustomFields map[string]interface{} `json:"custom_fields"`
 	}
 
@@ -952,28 +1019,54 @@ func (h *Handler) UpdateBusinessData(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	logger.Info("req is:%+v", req)
 
 	data, err := h.storage.GetBusinessDataByID(module, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Business data not found"})
 		return
 	}
-	logger.Error("data is %+v", data)
+
+	fieldDefs, err := h.storage.GetFieldDefinitionsByModule(module)
+	if err == nil && len(fieldDefs) > 0 && req.Data != nil {
+		for _, fieldDef := range fieldDefs {
+			value := req.Data[fieldDef.FieldName]
+			result := fieldDef.Validate(value)
+			if !result.Valid {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":  "字段验证失败",
+					"errors": result.Errors,
+					"module": module,
+					"field":  fieldDef.FieldName,
+				})
+				return
+			}
+		}
+	}
+
+	userID, _ := c.Get("user_id")
+	userIDStr := "unknown"
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
 
 	if req.Description != "" {
 		data.Description = req.Description
 	}
+	if req.Data != nil {
+		data.CustomFields = req.Data
+	}
 	if req.CustomFields != nil {
 		data.CustomFields = req.CustomFields
 	}
+	data.UpdatedBy = userIDStr
+	data.UpdatedAt = time.Now()
 
 	if err := h.storage.UpdateBusinessData(data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, data)
 }
 
 func (h *Handler) DeleteBusinessData(c *gin.Context) {
@@ -1043,6 +1136,7 @@ func (h *Handler) SubmitScrapeTask(c *gin.Context) {
 		Module      string `json:"module" binding:"required"`
 		DataPath    string `json:"data_path" binding:"required"`
 		ScraperPath string `json:"scraper_path" binding:"required"`
+		Description string `json:"description"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1055,6 +1149,7 @@ func (h *Handler) SubmitScrapeTask(c *gin.Context) {
 		DataPath:    req.DataPath,
 		ScraperPath: req.ScraperPath,
 		Status:      models.ScrapeTaskStatusPending,
+		Description: req.Description,
 	}
 
 	userID, _ := c.Get("user_id")
@@ -1161,6 +1256,26 @@ func (h *Handler) DeleteScrapeTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Scrape task deleted successfully"})
 }
 
+func (h *Handler) BatchDeleteScrapeTasks(c *gin.Context) {
+	var req struct {
+		IDs []string `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	deletedCount := 0
+	for _, id := range req.IDs {
+		if err := h.storage.DeleteScrapeTask(id); err != nil {
+			continue
+		}
+		deletedCount++
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Scrape tasks deleted successfully", "deleted_count": deletedCount})
+}
+
 func (h *Handler) GetDeletedScrapeTasksByModule(c *gin.Context) {
 	module := c.Param("module")
 	// 如果module为"all"，则查询所有模块的删除任务
@@ -1225,10 +1340,16 @@ func (h *Handler) GetCollections(c *gin.Context) {
 		return
 	}
 
+	total, err := h.storage.GetCollectionsCount()
+	if err != nil {
+		total = int64(len(collections))
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":     collections,
 		"page":     page,
 		"pageSize": pageSize,
+		"total":    total,
 	})
 }
 
