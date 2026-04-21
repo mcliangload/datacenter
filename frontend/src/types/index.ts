@@ -83,7 +83,8 @@ export interface UpdateRoleRequest {
   permission_ids?: string[]
 }
 
-export interface ApiResponse {
+export interface ApiResponse<T = any> {
+  data?: T
   message?: string
   error?: string
 }

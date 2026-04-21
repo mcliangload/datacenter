@@ -2,7 +2,7 @@ import { Button, Layout, Menu, Space, Breadcrumb, Dropdown, Avatar } from 'antd'
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { SettingOutlined, UserOutlined, LogoutOutlined, UserAddOutlined, TeamOutlined, LockOutlined, SearchOutlined, MenuFoldOutlined, MenuUnfoldOutlined, DatabaseOutlined } from '@ant-design/icons'
+import { SettingOutlined, UserOutlined, LogoutOutlined, UserAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, DatabaseOutlined } from '@ant-design/icons'
 
 const { Header, Content, Sider } = Layout
 

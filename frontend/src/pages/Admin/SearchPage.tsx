@@ -41,6 +41,22 @@ interface Collection {
   collection_name: string
 }
 
+interface DynamicField {
+  name: string
+  type: string
+  required: boolean
+  constraints: {
+    type?: string
+    min?: number
+    max?: number
+    min_length?: number
+    max_length?: number
+    pattern?: string
+    enum_values?: string[]
+  }
+  isDefinition: boolean
+}
+
 const SearchPage: React.FC = () => {
   const [data, setData] = useState<BusinessData[]>([])
   const [loading, setLoading] = useState(false)
@@ -76,7 +92,7 @@ const SearchPage: React.FC = () => {
     }
     try {
       const response = await apiClient.get(`/api/fields/module/${module}`)
-      const fields = response.data.data
+      const fields = response.data.data as FieldDefinition[]
       setFieldDefinitions(fields || [])
     } catch (error) {
       console.error('获取字段定义失败', error)
@@ -122,7 +138,7 @@ const SearchPage: React.FC = () => {
     }
   }, [module, fetchData])
 
-  const dynamicFields = useMemo(() => {
+  const dynamicFields = useMemo((): DynamicField[] => {
     if (fieldDefinitions.length > 0) {
       return fieldDefinitions.map(f => ({
         name: f.field_name,
@@ -351,7 +367,7 @@ const SearchPage: React.FC = () => {
   }
 
   const getColumns = () => {
-    const baseColumns = [
+    const baseColumns: any[] = [
       {
         title: 'ID',
         dataIndex: '_id',
@@ -403,7 +419,7 @@ const SearchPage: React.FC = () => {
         key: field.name,
         width: 120,
         ellipsis: true,
-        render: (value: any, record: BusinessData) => {
+        render: (_value: any, record: BusinessData) => {
           const customFields = record.custom_fields || {}
           const fieldValue = customFields[field.name]
           if (fieldValue === null || fieldValue === undefined) {

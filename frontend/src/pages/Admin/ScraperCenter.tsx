@@ -11,7 +11,7 @@ const ScraperCenter: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [form] = Form.useForm()
-  const [activeTab, setActiveTab] = useState('data')
+  const [activeTab] = useState('data')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [deletedPagination, setDeletedPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [modules, setModules] = useState<{ value: string; label: string }[]>([])
@@ -172,7 +172,7 @@ const ScraperCenter: React.FC = () => {
     }
     setLoading(true)
     try {
-      const result = await scraperService.batchDeleteScrapeTasks(selectedRowKeys as string[])
+      await scraperService.batchDeleteScrapeTasks(selectedRowKeys as string[])
       message.success(`成功删除 ${selectedRowKeys.length} 条数据`)
       setSelectedRowKeys([])
       handleSearch()
