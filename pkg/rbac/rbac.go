@@ -70,17 +70,10 @@ func (s *Service) CheckPermission(ctx context.Context, userID string, requiredPe
 		return false, nil
 	}
 
-	if requiredPermission == PermissionSystemAdmin {
-		return false, nil
-	}
-
+	// 检查用户是否拥有超级管理员权限
 	for _, roleID := range user.RoleIDs {
 		role, err := s.storage.GetRoleByID(roleID)
 		if err != nil {
-			continue
-		}
-
-		if len(role.PermissionIDs) == 0 {
 			continue
 		}
 
@@ -90,6 +83,12 @@ func (s *Service) CheckPermission(ctx context.Context, userID string, requiredPe
 				continue
 			}
 
+			// 如果用户拥有超级管理员权限，则允许访问所有资源
+			if perm.Code == string(PermissionSystemAdmin) {
+				return true, nil
+			}
+
+			// 检查是否匹配所需权限
 			if s.matchPermission(perm.Code, string(requiredPermission)) {
 				return true, nil
 			}

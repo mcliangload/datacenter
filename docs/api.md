@@ -36,8 +36,34 @@ POST /api/auth/login
     "id": "69e4976f843426c5b9c31f9f",
     "username": "admin",
     "email": "admin@datacenter.local",
-    "roles": []
+    "roles": ["role_id_1", "role_id_2"]
   }
+}
+```
+
+### 注册
+
+```
+POST /api/auth/register
+```
+
+**请求体**:
+
+```json
+{
+  "username": "newuser",
+  "password": "password123",
+  "email": "newuser@example.com"
+}
+```
+
+**响应**: `201 Created`
+
+```json
+{
+  "id": "new_user_id",
+  "username": "newuser",
+  "email": "newuser@example.com"
 }
 ```
 
@@ -64,10 +90,12 @@ GET /api/users?page=1&pageSize=10
 {
   "data": [
     {
-      "id": "69e4976f843426c5b9c31f9f",
+      "_id": "69e4976f843426c5b9c31f9f",
       "username": "admin",
       "email": "admin@datacenter.local",
-      "role_ids": ["role_id_1", "role_id_2"]
+      "role_ids": ["role_id_1", "role_id_2"],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
     }
   ],
   "total": 50,
@@ -86,10 +114,12 @@ GET /api/users/:id
 
 ```json
 {
-  "id": "69e4976f843426c5b9c31f9f",
+  "_id": "69e4976f843426c5b9c31f9f",
   "username": "admin",
   "email": "admin@datacenter.local",
-  "role_ids": ["role_id_1"]
+  "role_ids": ["role_id_1"],
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -114,10 +144,12 @@ POST /api/users
 
 ```json
 {
-  "id": "new_user_id",
+  "_id": "new_user_id",
   "username": "newuser",
   "email": "newuser@example.com",
-  "role_ids": ["role_id_1"]
+  "role_ids": ["role_id_1"],
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -132,7 +164,8 @@ PUT /api/users/:id
 ```json
 {
   "email": "updated@example.com",
-  "password": "newpassword"
+  "password": "newpassword",
+  "role_ids": ["role_id_1", "role_id_2"]
 }
 ```
 
@@ -154,6 +187,12 @@ POST /api/users/:id/roles
 {
   "role_id": "role_id"
 }
+```
+
+### 从用户移除角色
+
+```
+DELETE /api/users/:id/roles/:roleId
 ```
 
 ### 获取用户角色
@@ -185,9 +224,9 @@ GET /api/permissions?page=1&pageSize=10
 {
   "data": [
     {
-      "id": "permission_id",
+      "_id": "permission_id",
       "name": "用户管理",
-      "code": "user:manage",
+      "code": "user:write",
       "description": "管理系统用户账户"
     }
   ],
@@ -214,7 +253,7 @@ POST /api/permissions
 ```json
 {
   "name": "数据管理",
-  "code": "data:manage",
+  "code": "data:write",
   "description": "管理系统数据"
 }
 ```
@@ -254,7 +293,7 @@ GET /api/roles?page=1&pageSize=10
 {
   "data": [
     {
-      "id": "role_id",
+      "_id": "role_id",
       "name": "管理员",
       "code": "admin",
       "description": "系统管理员",
@@ -316,6 +355,12 @@ POST /api/roles/:id/permissions
 }
 ```
 
+### 从角色移除权限
+
+```
+DELETE /api/roles/:id/permissions/:permissionId
+```
+
 ### 获取角色权限
 
 ```
@@ -354,7 +399,11 @@ GET /api/business/module/:module?page=1&pageSize=10&jql=field:value
         "director": "导演",
         "year": 2024
       },
-      "file_path": "/data/movie.json"
+      "file_path": "/data/movie.json",
+      "created_by": "admin",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_by": "admin",
+      "updated_at": "2024-01-15T10:30:00Z"
     }
   ],
   "total": 100,
@@ -366,10 +415,10 @@ GET /api/business/module/:module?page=1&pageSize=10&jql=field:value
 ### 获取单个业务数据
 
 ```
-GET /api/business/:id
+GET /api/business/module/:module/:id
 ```
 
-### 创建业务数据（并启动刮削）
+### 创建业务数据
 
 ```
 POST /api/business
@@ -380,9 +429,12 @@ POST /api/business
 ```json
 {
   "module": "movie",
-  "data_path": "/data/movies.json",
-  "scraper_path": "/scrapers/movie_scraper.py",
-  "description": "电影数据刮削任务"
+  "data": {
+    "title": "电影标题",
+    "director": "导演",
+    "year": 2024
+  },
+  "description": "电影数据描述"
 }
 ```
 
@@ -390,10 +442,20 @@ POST /api/business
 
 ```json
 {
-  "message": "数据上传成功，刮削任务已开始",
-  "task_id": "task_id",
-  "module": "movie",
-  "data_path": "/data/movies.json"
+  "message": "数据创建成功",
+  "data": {
+    "_id": "data_id",
+    "module": "movie",
+    "description": "电影数据描述",
+    "custom_fields": {
+      "title": "电影标题",
+      "director": "导演",
+      "year": 2024
+    },
+    "created_by": "admin",
+    "created_at": "2024-01-15T10:30:00Z"
+  },
+  "module": "movie"
 }
 ```
 
@@ -408,13 +470,25 @@ POST /api/business
 ### 更新业务数据
 
 ```
-PUT /api/business/:id
+PUT /api/business/module/:module/:id
+```
+
+**请求体**:
+
+```json
+{
+  "description": "更新后的描述",
+  "data": {
+    "title": "更新后的标题",
+    "year": 2025
+  }
+}
 ```
 
 ### 删除业务数据
 
 ```
-DELETE /api/business/:id
+DELETE /api/business/module/:module/:id
 ```
 
 ***
@@ -425,6 +499,27 @@ DELETE /api/business/:id
 
 ```
 GET /api/collections?page=1&pageSize=10
+```
+
+**响应**:
+
+```json
+{
+  "data": [
+    {
+      "_id": "collection_id",
+      "module": "movie",
+      "description": "电影数据模块",
+      "datatype_owner": "admin",
+      "collection_name": "movie_data",
+      "created_by": "admin",
+      "created_at": "2024-01-15T10:00:00Z"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 5
+}
 ```
 
 ### 获取单个集合
@@ -455,6 +550,15 @@ POST /api/collections
 PUT /api/collections/:module
 ```
 
+**请求体**:
+
+```json
+{
+  "description": "更新后的描述",
+  "datatype_owner": "new_owner"
+}
+```
+
 ### 删除集合
 
 ```
@@ -480,6 +584,18 @@ POST /api/collections/:module/indexes
 }
 ```
 
+### 获取索引列表
+
+```
+GET /api/collections/:module/indexes
+```
+
+### 删除索引
+
+```
+DELETE /api/collections/:module/indexes/:name
+```
+
 ***
 
 ## 刮削任务管理
@@ -496,7 +612,8 @@ POST /api/scraper/upload
 {
   "module": "movie",
   "data_path": "/data/movies.json",
-  "scraper_path": "/scrapers/movie_scraper.py"
+  "scraper_path": "/scrapers/movie_scraper.py",
+  "description": "刮削任务描述"
 }
 ```
 
@@ -520,7 +637,7 @@ GET /api/scraper/tasks?module=movie&status=success&page=1&pageSize=10
 | 参数       | 类型     | 描述                             |
 | -------- | ------ | ------------------------------ |
 | module   | string | 模块名                            |
-| status   | string | 任务状态 (scraping/success/failed) |
+| status   | string | 任务状态 (pending/scraping/success/failed) |
 | page     | int    | 当前页码                           |
 | pageSize | int    | 每页数量                           |
 
@@ -548,6 +665,20 @@ POST /api/scraper/tasks/:id/retry
 
 ```
 DELETE /api/scraper/tasks/:id
+```
+
+### 批量删除刮削任务
+
+```
+POST /api/scraper/tasks/batch-delete
+```
+
+**请求体**:
+
+```json
+{
+  "ids": ["task_id_1", "task_id_2"]
+}
 ```
 
 ***
@@ -582,6 +713,8 @@ POST /api/deleted/:id/recover
 GET /api/deleted-scraper/module/:module?page=1&pageSize=10
 ```
 
+**注意**: 当 module 参数为 "all" 时，查询所有模块的已删除任务
+
 ### 获取单个已删除刮削任务
 
 ```
@@ -609,10 +742,14 @@ POST /api/fields
 ```json
 {
   "module": "movie",
-  "name": "电影标题",
-  "code": "title",
-  "type": "string",
-  "required": true
+  "field_name": "title",
+  "field_type": "string",
+  "description": "电影标题",
+  "constraints": {
+    "type": "string",
+    "min_length": 1,
+    "max_length": 200
+  }
 }
 ```
 
@@ -632,6 +769,21 @@ GET /api/fields/:id
 
 ```
 PUT /api/fields/:id
+```
+
+**请求体**:
+
+```json
+{
+  "field_name": "updated_title",
+  "field_type": "string",
+  "description": "更新后的描述",
+  "constraints": {
+    "type": "string",
+    "min_length": 1,
+    "max_length": 100
+  }
+}
 ```
 
 ### 删除字段定义
@@ -658,6 +810,7 @@ DELETE /api/fields/:id
 - `201 Created` - 资源创建成功
 - `400 Bad Request` - 请求参数错误
 - `401 Unauthorized` - 未授权/Token无效
+- `403 Forbidden` - 无权限
 - `404 Not Found` - 资源不存在
 - `500 Internal Server Error` - 服务器内部错误
 
@@ -684,3 +837,35 @@ DELETE /api/fields/:id
 - `pageSize`: 每页数量
 
 **总页数计算**: `totalPages = Math.ceil(total / pageSize)`
+
+***
+
+## 权限说明
+
+系统使用基于资源的权限代码格式，支持通配符匹配：
+
+| 权限代码 | 描述 |
+|------|------|
+| user:* | 用户完全控制 |
+| user:read | 查看用户 |
+| user:write | 管理用户 |
+| role:* | 角色完全控制 |
+| role:read | 查看角色 |
+| role:write | 管理角色 |
+| permission:* | 权限完全控制 |
+| permission:read | 查看权限 |
+| permission:write | 管理权限 |
+| data:* | 数据完全控制 |
+| data:read | 查看数据 |
+| data:write | 管理数据 |
+| field:* | 字段完全控制 |
+| field:read | 查看字段 |
+| field:write | 管理字段 |
+| scrape:* | 刮削完全控制 |
+| scrape:read | 查看刮削任务 |
+| scrape:write | 管理刮削任务 |
+| collection:* | 集合完全控制 |
+| collection:read | 查看集合 |
+| collection:write | 管理集合 |
+
+**通配符匹配规则**: 例如 `user:*` 权限可以匹配 `user:read`、`user:write` 等所有 user 模块的权限。

@@ -3,7 +3,6 @@ package jql
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -70,8 +69,47 @@ func (p *Parser) tokenize(query string) ([]Token, error) {
 	query = strings.TrimSpace(query)
 
 	for len(query) > 0 {
-		if strings.HasPrefix(query, " ") {
-			query = strings.TrimSpace(query)
+		query = strings.TrimSpace(query)
+		if len(query) == 0 {
+			break
+		}
+		lowerQuery := strings.ToLower(query)
+		if strings.HasPrefix(lowerQuery, "and") && (len(query) == 3 || !isAlphanumeric(byte(query[3]))) {
+			tokens = append(tokens, Token{Type: TokenTypeAnd, Value: "AND"})
+			query = query[3:]
+			continue
+		}
+		if strings.HasPrefix(lowerQuery, "or") && (len(query) == 2 || !isAlphanumeric(byte(query[2]))) {
+			tokens = append(tokens, Token{Type: TokenTypeOr, Value: "OR"})
+			query = query[2:]
+			continue
+		}
+		if strings.HasPrefix(lowerQuery, "is null") {
+			tokens = append(tokens, Token{Type: TokenTypeIsNull, Value: "IS NULL"})
+			query = query[7:]
+			continue
+		}
+		if strings.HasPrefix(lowerQuery, "is not null") {
+			tokens = append(tokens, Token{Type: TokenTypeIsNotNull, Value: "IS NOT NULL"})
+			query = query[11:]
+			continue
+		}
+
+		if strings.HasPrefix(lowerQuery, "not in") && (len(query) == 6 || !isAlphanumeric(byte(query[6]))) {
+			tokens = append(tokens, Token{Type: TokenTypeNotIn, Value: "NOT IN"})
+			query = query[6:]
+			continue
+		}
+
+		if strings.HasPrefix(lowerQuery, "not") && (len(query) == 3 || !isAlphanumeric(byte(query[3]))) {
+			tokens = append(tokens, Token{Type: TokenTypeNot, Value: "NOT"})
+			query = query[3:]
+			continue
+		}
+
+		if strings.HasPrefix(lowerQuery, "in") && (len(query) == 2 || !isAlphanumeric(byte(query[2]))) {
+			tokens = append(tokens, Token{Type: TokenTypeIn, Value: "IN"})
+			query = query[2:]
 			continue
 		}
 
@@ -91,34 +129,6 @@ func (p *Parser) tokenize(query string) ([]Token, error) {
 			continue
 		}
 
-		lowerQuery := strings.ToLower(query)
-		if strings.HasPrefix(lowerQuery, "and") && (len(query) == 3 || !isAlphanumeric(byte(query[3]))) {
-			tokens = append(tokens, Token{Type: TokenTypeAnd, Value: "AND"})
-			query = query[3:]
-			continue
-		}
-		if strings.HasPrefix(lowerQuery, "or") && (len(query) == 2 || !isAlphanumeric(byte(query[2]))) {
-			tokens = append(tokens, Token{Type: TokenTypeOr, Value: "OR"})
-			query = query[2:]
-			continue
-		}
-		if strings.HasPrefix(lowerQuery, "not") && (len(query) == 3 || !isAlphanumeric(byte(query[3]))) {
-			tokens = append(tokens, Token{Type: TokenTypeNot, Value: "NOT"})
-			query = query[3:]
-			continue
-		}
-
-		if strings.HasPrefix(lowerQuery, "is null") {
-			tokens = append(tokens, Token{Type: TokenTypeIsNull, Value: "IS NULL"})
-			query = query[7:]
-			continue
-		}
-		if strings.HasPrefix(lowerQuery, "is not null") {
-			tokens = append(tokens, Token{Type: TokenTypeIsNotNull, Value: "IS NOT NULL"})
-			query = query[11:]
-			continue
-		}
-
 		operators := []string{">=", "<=", "!=", "=", ">", "<", "~"}
 		found := false
 		for _, op := range operators {
@@ -130,6 +140,63 @@ func (p *Parser) tokenize(query string) ([]Token, error) {
 			}
 		}
 		if found {
+			continue
+		}
+
+		if (query[0] == '-' || query[0] == '+') && len(query) > 1 && query[1] >= '0' && query[1] <= '9' {
+			end := 1
+			hasDot := false
+			for end < len(query) {
+				c := query[end]
+				if c == '.' {
+					if hasDot {
+						break
+					}
+					hasDot = true
+					end++
+					continue
+				}
+				if c < '0' || c > '9' {
+					break
+				}
+				end++
+			}
+			value := query[:end]
+			tokens = append(tokens, Token{Type: TokenTypeValue, Value: value})
+			query = query[end:]
+			continue
+		}
+
+		if query[0] >= '0' && query[0] <= '9' {
+			end := 0
+			hasDot := false
+			for end < len(query) {
+				c := query[end]
+				if c >= '0' && c <= '9' {
+					end++
+					continue
+				}
+				if c == '.' && !hasDot {
+					hasDot = true
+					end++
+					continue
+				}
+				break
+			}
+			value := query[:end]
+			tokens = append(tokens, Token{Type: TokenTypeValue, Value: value})
+			query = query[end:]
+			continue
+		}
+
+		if isFunctionName(query) {
+			end := 0
+			for end < len(query) && (isFieldName(query[end]) || query[end] == '.') {
+				end++
+			}
+			funcName := query[:end]
+			tokens = append(tokens, Token{Type: TokenTypeFunction, Value: funcName})
+			query = query[end:]
 			continue
 		}
 
@@ -154,30 +221,9 @@ func (p *Parser) tokenize(query string) ([]Token, error) {
 			tokens = append(tokens, Token{Type: TokenTypeValue, Value: value})
 			query = query[end+2:]
 			continue
-		} else {
-			end := 0
-			for end < len(query) && !isWhitespace(query[end]) && query[end] != '(' && query[end] != ')' && query[end] != ',' {
-				end++
-			}
-			value := strings.TrimSpace(query[:end])
-			if value != "" {
-				if strings.ToLower(value) == "in" {
-					tokens = append(tokens, Token{Type: TokenTypeIn, Value: "IN"})
-				} else if strings.ToLower(value) == "not" {
-					nextQuery := strings.TrimSpace(query[3:])
-					if strings.HasPrefix(strings.ToLower(nextQuery), "in") {
-						tokens = append(tokens, Token{Type: TokenTypeNotIn, Value: "NOT IN"})
-						query = strings.TrimSpace(query[3:])
-						continue
-					}
-					tokens = append(tokens, Token{Type: TokenTypeValue, Value: value})
-				} else {
-					tokens = append(tokens, Token{Type: TokenTypeValue, Value: value})
-				}
-			}
-			query = query[end:]
-			continue
 		}
+
+		return nil, fmt.Errorf("unexpected character: %s", string(query[0]))
 	}
 
 	return tokens, nil
@@ -189,6 +235,30 @@ func isAlphanumeric(c byte) bool {
 
 func isFieldName(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.'
+}
+
+var knownFunctions = []string{
+	"CurrentUser", "Now", "StartOfDay", "EndOfDay",
+	"StartOfWeek", "EndOfWeek", "StartOfMonth", "EndOfMonth",
+}
+
+func isFunctionName(query string) bool {
+	lowerQuery := strings.ToLower(query)
+	for _, fn := range knownFunctions {
+		lowerFn := strings.ToLower(fn)
+		if strings.HasPrefix(lowerQuery, lowerFn) {
+			endIdx := len(fn)
+			if endIdx < len(query) {
+				nextChar := query[endIdx]
+				if nextChar == '(' {
+					return true
+				}
+			} else {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isWhitespace(c byte) bool {
@@ -288,23 +358,14 @@ func (p *Parser) parsePrimaryExpression() (interface{}, error) {
 			return p.convertCondition(fieldName, "IS NOT NULL", nil), nil
 		}
 
-		if p.pos >= len(p.tokens) || opToken.Type != TokenTypeOperator {
+		if p.pos >= len(p.tokens) || (opToken.Type != TokenTypeOperator && opToken.Type != TokenTypeIn && opToken.Type != TokenTypeNotIn) {
 			return nil, errors.New("expected operator")
 		}
 
 		operator := opToken.Value
 		p.pos++
 
-		if p.pos >= len(p.tokens) {
-			return nil, errors.New("expected value after operator")
-		}
-
-		valueToken := p.tokens[p.pos]
-
-		if valueToken.Type == TokenTypeIn || valueToken.Type == TokenTypeNotIn {
-			isNotIn := valueToken.Type == TokenTypeNotIn
-			p.pos++
-
+		if operator == "IN" || operator == "NOT IN" {
 			if p.pos >= len(p.tokens) || p.tokens[p.pos].Type != TokenTypeLeftParen {
 				return nil, errors.New("expected ( after IN/NOT IN")
 			}
@@ -334,11 +395,17 @@ func (p *Parser) parsePrimaryExpression() (interface{}, error) {
 				}
 			}
 
-			if isNotIn {
+			if operator == "NOT IN" {
 				return p.convertCondition(fieldName, "NOT IN", values), nil
 			}
 			return p.convertCondition(fieldName, "IN", values), nil
 		}
+
+		if p.pos >= len(p.tokens) {
+			return nil, errors.New("expected value after operator")
+		}
+
+		valueToken := p.tokens[p.pos]
 
 		var value interface{}
 		if valueToken.Type == TokenTypeFunction {
@@ -346,8 +413,6 @@ func (p *Parser) parsePrimaryExpression() (interface{}, error) {
 		} else {
 			value = p.parseValue()
 		}
-
-		p.pos++
 
 		return p.convertCondition(fieldName, operator, value), nil
 	}
@@ -361,6 +426,7 @@ func (p *Parser) parseValue() interface{} {
 	}
 
 	token := p.tokens[p.pos]
+	p.pos++
 
 	switch token.Type {
 	case TokenTypeValue:
@@ -373,13 +439,13 @@ func (p *Parser) parseValue() interface{} {
 }
 
 func (p *Parser) parseValueType(value string) interface{} {
-	if matched, _ := regexp.MatchString(`^-?\d+$`, value); matched {
+	if isInteger(value) {
 		intVal := 0
 		fmt.Sscanf(value, "%d", &intVal)
 		return intVal
 	}
 
-	if matched, _ := regexp.MatchString(`^-?\d+\.\d+$`, value); matched {
+	if isFloat(value) {
 		var floatVal float64
 		fmt.Sscanf(value, "%f", &floatVal)
 		return floatVal
@@ -394,6 +460,43 @@ func (p *Parser) parseValueType(value string) interface{} {
 	}
 
 	return value
+}
+
+func isInteger(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	start := 0
+	if s[0] == '-' || s[0] == '+' {
+		start = 1
+	}
+	if start >= len(s) {
+		return false
+	}
+	for _, c := range s[start:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isFloat(s string) bool {
+	dotCount := 0
+	start := 0
+	if len(s) > 0 && (s[0] == '-' || s[0] == '+') {
+		start = 1
+	}
+	for _, c := range s[start:] {
+		if c == '.' {
+			dotCount++
+			continue
+		}
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return dotCount == 1
 }
 
 func (p *Parser) parseFunction(funcName string) interface{} {
@@ -472,6 +575,27 @@ func (p *Parser) convertCondition(field, operator string, value interface{}) bso
 
 func (p *Parser) convertToMongoQuery(ast interface{}) bson.M {
 	switch v := ast.(type) {
+	case bson.M:
+		result := bson.M{}
+		for key, val := range v {
+			switch key {
+			case "$and", "$or":
+				var conditions []bson.M
+				for _, item := range val.([]interface{}) {
+					conditions = append(conditions, p.convertToMongoQuery(item))
+				}
+				result[key] = conditions
+			case "$not":
+				result[key] = p.convertToMongoQuery(val)
+			default:
+				if vm, ok := val.(bson.M); ok {
+					result[key] = p.convertToMongoQuery(vm)
+				} else {
+					result[key] = val
+				}
+			}
+		}
+		return result
 	case map[string]interface{}:
 		result := bson.M{}
 		for key, val := range v {
@@ -485,7 +609,11 @@ func (p *Parser) convertToMongoQuery(ast interface{}) bson.M {
 			case "$not":
 				result[key] = p.convertToMongoQuery(val)
 			default:
-				result[key] = val
+				if vm, ok := val.(bson.M); ok {
+					result[key] = p.convertToMongoQuery(vm)
+				} else {
+					result[key] = val
+				}
 			}
 		}
 		return result
@@ -502,11 +630,11 @@ func ParseQuery(query string) (bson.M, error) {
 func GetExampleQueries() []string {
 	return []string{
 		`status = "active"`,
-		`name contains "产品"`,
+		`name ~ "产品"`,
 		`price > 100`,
 		`status IN ("active", "pending")`,
 		`category NOT IN ("deleted", "archived")`,
-		`title LIKE "重要%"`,
+		`title ~ "重要"`,
 		`created > "2024-01-01"`,
 		`assignee IS NULL`,
 		`email IS NOT NULL`,

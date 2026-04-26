@@ -810,7 +810,19 @@ func (s *mongodbStorage) DeleteCollection(module string) error {
 		return err
 	}
 
+	// 删除字段定义
+	_, _ = s.fieldDefs.DeleteMany(context.Background(), bson.M{"module": module})
+
+	// 删除动态数据集合
 	collectionName := module + "_data"
 	delete(s.dynamicColls, collectionName)
-	return s.database.Collection(collectionName).Drop(context.Background())
+	s.database.Collection(collectionName).Drop(context.Background())
+
+	// 删除已删除数据
+	_, _ = s.deletedData.DeleteMany(context.Background(), bson.M{"module": module})
+
+	// 删除刮削任务
+	_, _ = s.scrapeTasks.DeleteMany(context.Background(), bson.M{"module": module})
+
+	return nil
 }

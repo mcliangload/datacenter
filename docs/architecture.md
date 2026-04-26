@@ -9,7 +9,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      客户端层 (Client Layer)                  │
-│           React + TypeScript + Ant Design 5                  │
+│                   React + TypeScript + Ant Design            │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼ HTTPS
@@ -74,58 +74,28 @@ datacenter/
 │   │   └── handlers.go          # HTTP处理器 (所有RESTful接口)
 │   ├── auth/
 │   │   ├── jwt.go              # JWT服务
-│   │   └── middleware.go        # 认证中间件
+│   │   ├── middleware.go        # 认证中间件
+│   │   └── test/               # JWT测试
 │   ├── logger/
 │   │   ├── logger.go           # 日志初始化
 │   │   └── middleware.go       # HTTP日志中间件
 │   ├── models/
-│   │   └── models.go          # 数据模型定义
+│   │   └── models.go           # 数据模型定义
 │   ├── scraper/
 │   │   └── scraper.go          # 刮削任务处理系统
 │   └── storage/
-│       ├── mongodb.go          # 业务数据存储 (MongoDB)
-│       └── rbac_storage.go     # RBAC存储 (独立MongoDB)
+│       ├── mongodb.go          # MongoDB连接
+│       ├── mongodb_storage.go  # 业务数据存储
+│       └── rbac_storage.go     # RBAC存储
 ├── pkg/
 │   ├── jql/
 │   │   └── parser.go           # JQL查询解析器
 │   └── rbac/
 │       └── rbac.go             # RBAC权限服务
-├── configs/
-│   └── config.yaml             # 配置文件
 └── docs/                       # 文档
 ```
 
-### 3.2 前端模块结构
-
-```
-frontend/
-├── src/
-│   ├── pages/
-│   │   ├── Admin/
-│   │   │   ├── AdminLayout.tsx       # 管理后台布局
-│   │   │   ├── UserManagement.tsx    # 用户管理
-│   │   │   ├── RoleManagement.tsx     # 角色管理
-│   │   │   ├── PermissionManagement.tsx # 权限管理
-│   │   │   └── SearchPage.tsx       # 数据搜索
-│   │   └── Login/
-│   │       └── LoginPage.tsx         # 登录页面
-│   ├── services/
-│   │   ├── api.ts              # API客户端
-│   │   ├── auth.ts             # 认证服务
-│   │   ├── rbac.ts             # RBAC服务
-│   │   └── user.ts             # 用户服务
-│   ├── stores/
-│   │   └── authStore.ts        # 认证状态管理
-│   ├── theme/
-│   │   └── themeConfig.ts      # Ant Design主题配置
-│   ├── types/
-│   │   └── index.ts            # TypeScript类型定义
-│   ├── App.tsx                 # 根组件
-│   └── main.tsx                # 入口文件
-└── dist/                       # 构建输出
-```
-
-### 3.3 模块职责说明
+### 3.2 模块职责说明
 
 | 模块 | 路径 | 职责 |
 |------|------|------|
@@ -133,16 +103,11 @@ frontend/
 | API Handlers | internal/api | 处理所有HTTP请求，实现RESTful接口 |
 | Auth | internal/auth | JWT Token生成验证、密码加密、认证中间件 |
 | Logger | internal/logger | zerolog日志初始化、HTTP请求日志中间件 |
-| Models | internal/models | 定义User、Role、Permission、BusinessData等数据结构 |
+| Models | internal/models | 定义User、Role、Permission、BusinessData、ScrapeTask等数据结构 |
 | Storage | internal/storage | MongoDB数据访问层，业务和RBAC分别独立存储 |
 | Scraper | internal/scraper | 刮削任务队列、工作协程池、任务状态管理 |
 | JQL Parser | pkg/jql | JQL查询语句解析和转换 |
-| RBAC | pkg/rbac | 权限检查、用户权限获取 |
-| **前端** | | |
-| Pages | pages/ | 页面组件：登录、用户管理、角色管理、权限管理、数据搜索 |
-| Services | services/ | API调用服务封装 |
-| Stores | stores/ | Zustand状态管理 |
-| Theme | theme/ | Ant Design主题配置 |
+| RBAC | pkg/rbac | 权限检查、用户权限获取、通配符匹配 |
 
 ## 4. 数据库架构
 
@@ -159,6 +124,7 @@ frontend/
 │ collections             │ users                            │
 │ field_definitions       │ permissions                      │
 │ scrape_tasks            │ roles                            │
+│ deleted_scrape_tasks    │                                  │
 │ {module}_data (动态)    │                                  │
 │ deleted_data            │                                  │
 └─────────────────────────┴─────────────────────────────────┘
@@ -219,9 +185,14 @@ frontend/
   "field_name": "title",
   "field_type": "string",
   "description": "电影标题",
+  "required": false,
+  "default_value": null,
   "constraints": {
+    "type": "string",
     "min_length": 1,
-    "max_length": 200
+    "max_length": 200,
+    "pattern": "",
+    "enum_values": []
   },
   "created_by": "admin",
   "created_at": ISODate("2024-01-15T10:00:00Z"),
@@ -229,6 +200,11 @@ frontend/
   "updated_at": ISODate("2024-01-15T10:00:00Z")
 }
 ```
+
+**约束类型**:
+- string: min_length, max_length, pattern, enum_values
+- number: min, max
+- array: list_min_length, list_max_length
 
 **索引**:
 - `{ module: 1, field_name: 1 }` - 复合唯一索引
@@ -245,13 +221,14 @@ frontend/
   "scraper_path": "/scrapers/movie_scraper.py",
   "status": "success",
   "result": {
-    "items_scraped": 8,
-    "duration_ms": 1523
+    "title": "Harry Potter",
+    "director": "Chris Columbus"
   },
   "error_message": "",
   "started_at": ISODate("2024-01-15T10:30:00Z"),
   "completed_at": ISODate("2024-01-15T10:30:02Z"),
   "business_data_id": ObjectId("..."),
+  "description": "电影数据刮削",
   "created_by": "admin",
   "created_at": ISODate("2024-01-15T10:30:00Z"),
   "updated_by": "admin",
@@ -271,11 +248,11 @@ frontend/
 | started_at | datetime | 开始时间 |
 | completed_at | datetime | 完成时间 |
 | business_data_id | ObjectId | 关联的业务数据ID |
+| description | string | 任务描述 |
 
 **索引**:
 - `{ module: 1, status: 1 }` - 复合索引
 - `{ created_at: -1 }` - 降序索引
-- `{ business_data_id: 1 }` - 关联查询索引
 
 #### 5.1.4 {module}_data 集合 (动态集合)
 
@@ -316,11 +293,6 @@ frontend/
 | task_id | string | 刮削任务ID (在custom_fields中) |
 | scraped_at | datetime | 刮削完成时间 (在custom_fields中) |
 
-**索引**:
-- `{ module: 1 }` - 模块索引
-- `{ created_at: -1 }` - 降序索引
-- 自定义字段索引 (根据field_definitions动态创建)
-
 #### 5.1.5 deleted_data 集合
 
 软删除的数据记录。
@@ -358,10 +330,7 @@ frontend/
   "data_path": "/data/movies/harry_potter.json",
   "scraper_path": "/scrapers/movie_scraper.py",
   "status": "success",
-  "result": {
-    "items_scraped": 8,
-    "duration_ms": 1523
-  },
+  "result": {...},
   "error_message": "",
   "started_at": ISODate("2024-01-15T10:30:00Z"),
   "completed_at": ISODate("2024-01-15T10:30:02Z"),
@@ -371,12 +340,6 @@ frontend/
   "updated_at": ISODate("2024-01-16T10:00:00Z")
 }
 ```
-
-**索引**:
-- `{ module: 1 }` - 模块索引
-- `{ original_id: 1 }` - 原始ID索引
-- `{ deleted_at: 1 }` - 删除时间索引
-- `{ business_data_id: 1 }` - 关联业务数据索引
 
 ### 5.2 RBAC数据库 (rbac)
 
@@ -410,7 +373,7 @@ frontend/
 {
   "_id": ObjectId,
   "name": "用户管理",
-  "code": "user:manage",
+  "code": "user:write",
   "description": "管理系统用户账户",
   "created_by": "system",
   "created_at": ISODate("2024-01-01T00:00:00Z"),
@@ -450,7 +413,8 @@ frontend/
 ```
 /api
 ├── public (无需认证)
-│   └── POST /auth/login          # 用户登录
+│   ├── POST /auth/login          # 用户登录
+│   └── POST /auth/register       # 用户注册
 │
 └── protected (需要JWT认证)
     ├── /users                   # 用户管理CRUD
@@ -460,6 +424,7 @@ frontend/
     ├── /business               # 业务数据CRUD
     ├── /deleted                # 已删除数据
     ├── /scraper               # 刮削任务管理
+    ├── /deleted-scraper       # 已删除刮削任务
     └── /collections            # 集合管理
 ```
 
@@ -470,6 +435,7 @@ frontend/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /api/auth/login | 用户登录 |
+| POST | /api/auth/register | 用户注册 |
 
 #### 用户管理接口
 
@@ -511,11 +477,11 @@ frontend/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | /api/business | 创建业务数据(触发刮削) |
-| GET | /api/business/module/:module | 按模块查询 (分页) |
-| GET | /api/business/:id | 获取详情 |
-| PUT | /api/business/:id | 更新 |
-| DELETE | /api/business/:id | 删除(软删除) |
+| POST | /api/business | 创建业务数据 |
+| GET | /api/business/module/:module | 按模块查询 (分页,JQL查询) |
+| GET | /api/business/module/:module/:id | 获取详情 |
+| PUT | /api/business/module/:module/:id | 更新 |
+| DELETE | /api/business/module/:module/:id | 删除(软删除) |
 
 #### 集合管理接口
 
@@ -558,28 +524,34 @@ frontend/
 
 ```
 ┌──────────┐    submit    ┌───────────┐   finish   ┌─────────┐
-│  None    │─────────────▶│ scraping  │──────────▶│ success │
+│  None    │─────────────▶│ pending   │──────────▶│ success │
 └──────────┘              └───────────┘            └─────────┘
-                              │   │                       ▲
+                              │
+                              ▼
+                         ┌─────────┐
+                         │ scraping│
+                         └─────────┘
+                              │
+                              │   │ (worker从队列取出)
                               │   └────── fail ───────────┘
                               ▼
                          ┌─────────┐
                          │ failed  │
                          └─────────┘
                               │
-                              └───── retry ────▶ scraping
+                              └───── retry ────▶ pending
 ```
 
 ### 7.3 刮削流程
 
-1. **提交任务**: 用户通过 `/api/business` 或 `/api/scraper/upload` 提交刮削任务
+1. **提交任务**: 用户通过 `/api/scraper/upload` 提交刮削任务
 2. **验证模块**: 检查模块集合是否存在
 3. **创建任务记录**: 在 `scrape_tasks` 集合中创建任务记录，状态为 `pending`
-4. **加入任务队列**: 任务进入工作协程池
-5. **执行刮削**: Worker 协程执行刮削器脚本
+4. **加入任务队列**: 任务进入工作协程池的 Channel 队列
+5. **执行刮削**: Worker 协程从 Channel 取出任务，执行刮削器脚本
 6. **更新状态**: 根据执行结果更新任务状态为 `scraping` -> `success`/`failed`
 7. **存储结果**: 成功时，将刮削结果存储到 `{module}_data` 集合，并更新任务的 `business_data_id`
-8. **重复刮削**: 用户可以重新提交同一数据路径的刮削任务进行重复刮削
+8. **任务重试**: 用户可以重新提交同一数据路径的刮削任务进行重复刮削
 
 ### 7.4 配置参数
 
@@ -594,7 +566,7 @@ frontend/
 
 ```
 ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│    User      │       │    Role     │       │  Permission │
+│    User     │       │    Role     │       │  Permission │
 ├─────────────┤       ├─────────────┤       ├─────────────┤
 │ _id         │       │ _id         │       │ _id         │
 │ username    │       │ name        │       │ name        │
@@ -605,32 +577,39 @@ frontend/
 └─────────────┘       └─────────────┘       └─────────────┘
 ```
 
-### 8.2 内置权限
+### 8.2 权限代码格式
 
-| 权限代码 | 权限名称 | 说明 |
-|----------|----------|------|
-| user:manage | 用户管理 | 管理系统用户账户 |
-| role:manage | 角色管理 | 管理系统角色 |
-| permission:manage | 权限管理 | 管理系统权限 |
-| data:query | 数据查询 | 查询业务数据 |
-| data:create | 数据创建 | 创建业务数据 |
-| data:update | 数据更新 | 更新业务数据 |
-| data:delete | 数据删除 | 删除业务数据 |
-| datatype:define | 类型定义 | 定义数据类型和自定义字段 |
-| collection:manage | 集合管理 | 管理数据集合 |
-| scrape:manage | 刮削管理 | 管理刮削任务 |
-| audit:view | 审计查看 | 查看审计日志 |
+系统使用基于资源的权限代码格式：
 
-### 8.3 内置角色
+| 权限代码 | 描述 |
+|----------|------|
+| user:* | 用户完全控制 |
+| user:read | 查看用户 |
+| user:write | 管理用户 |
+| role:* | 角色完全控制 |
+| role:read | 查看角色 |
+| role:write | 管理角色 |
+| permission:* | 权限完全控制 |
+| permission:read | 查看权限 |
+| permission:write | 管理权限 |
+| data:* | 数据完全控制 |
+| data:read | 查看数据 |
+| data:write | 管理数据 |
+| field:* | 字段完全控制 |
+| field:read | 查看字段 |
+| field:write | 管理字段 |
+| scrape:* | 刮削完全控制 |
+| scrape:read | 查看刮削任务 |
+| scrape:write | 管理刮削任务 |
+| collection:* | 集合完全控制 |
+| collection:read | 查看集合 |
+| collection:write | 管理集合 |
 
-| 角色代码 | 角色名称 | 权限 |
-|----------|----------|------|
-| root | 超级管理员 | 全部11个权限 |
-| datatypeowner | 数据类型所有者 | data:* + datatype:define + collection:manage + scrape:manage |
-| dataowner | 数据所有者 | data:* |
-| admin | 集合管理员 | data:* |
-| user | 集合用户 | data:query + data:update |
-| viewer | 只读用户 | data:query |
+### 8.3 通配符权限匹配
+
+RBAC服务支持通配符权限匹配：
+- `user:*` 可以匹配 `user:read`、`user:write` 等所有 user 模块的权限
+- `data:*` 可以匹配 `data:read`、`data:write` 等所有 data 模块的权限
 
 ## 9. 分页查询
 
@@ -664,13 +643,13 @@ frontend/
 |----------|------|------|
 | HTTP日志 | logs/http.log | API请求响应记录 |
 | 应用日志 | logs/app.log | 程序运行日志 |
-| 刮削日志 | logs/scraper.log | 刮削任务执行记录 |
 
 ### 10.2 日志配置
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | LOG_LEVEL | info | 日志级别 |
+| LOG_HTTP_FILE | logs/http.log | HTTP日志文件路径 |
 | LOG_MAX_SIZE | 100 | 单个日志文件最大MB |
 | LOG_MAX_BACKUPS | 5 | 保留日志文件数 |
 | LOG_MAX_AGE | 30 | 日志保留天数 |
@@ -694,9 +673,9 @@ frontend/
 
 ### 11.1 认证机制
 
-- JWT Token认证，有效期24小时
+- JWT Token认证，默认有效期24小时
 - Token包含用户ID和角色信息
-- 支持Token刷新机制
+- 支持Token刷新机制，默认刷新有效期720小时(30天)
 
 ### 11.2 密码安全
 
@@ -723,6 +702,10 @@ frontend/
 | MONGODB_RBAC_URI | mongodb://localhost:27017 | RBAC数据库连接 |
 | MONGODB_RBAC_DATABASE | rbac | RBAC数据库名 |
 | LOG_LEVEL | info | 日志级别 |
+| LOG_HTTP_FILE | logs/http.log | HTTP日志文件 |
+| LOG_MAX_SIZE | 100 | 日志最大MB |
+| LOG_MAX_BACKUPS | 5 | 日志备份数 |
+| LOG_MAX_AGE | 30 | 日志保留天数 |
 | SCRAPER_WORKERS | 4 | 刮削工作协程数 |
 
 ## 13. 部署架构

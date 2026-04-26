@@ -1,4 +1,4 @@
-import { Button, Card, Table, message, Space, Modal, Form, Input, Popconfirm } from 'antd'
+import { Button, Card, Table, message, Space, Modal, Form, Input, Select, Popconfirm } from 'antd'
 import { useState, useCallback, useEffect } from 'react'
 import { ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import apiClient from '../../services/api'
@@ -15,12 +15,19 @@ interface Collection {
   updated_at: string
 }
 
+interface UserOption {
+  _id: string
+  username: string
+  email: string
+}
+
 const CollectionQueryPage: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(false)
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null)
+  const [users, setUsers] = useState<UserOption[]>([])
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
   const [total, setTotal] = useState(0)
@@ -43,6 +50,23 @@ const CollectionQueryPage: React.FC = () => {
       setCollections([])
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/users', {
+        params: { page: 1, pageSize: 100 }
+      })
+      const userData = response.data.data || []
+      const mapped = userData.map((u: any) => ({
+        _id: u._id,
+        username: u.username,
+        email: u.email
+      }))
+      setUsers(mapped)
+    } catch (error) {
+      console.error('获取用户列表失败', error)
     }
   }, [])
 
@@ -82,6 +106,7 @@ const CollectionQueryPage: React.FC = () => {
       description: record.description,
       datatype_owner: record.datatype_owner
     })
+    fetchUsers()
     setEditModalVisible(true)
   }
 
@@ -107,7 +132,7 @@ const CollectionQueryPage: React.FC = () => {
     setLoading(true)
     try {
       await apiClient.delete(`/api/collections/${module}`)
-      message.success('集合删除成功')
+      message.success('集合删除成功，已级联删除所有关联数据')
       fetchCollections(page, pageSize)
     } catch (error: any) {
       console.error('删除集合失败', error)
@@ -116,6 +141,14 @@ const CollectionQueryPage: React.FC = () => {
       setLoading(false)
     }
   }
+
+  const openCreateModal = () => {
+    fetchUsers()
+    setCreateModalVisible(true)
+  }
+
+  const filterOption = (input: string, option?: { label: string; value: string }) =>
+    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
 
   const columns = [
     {
@@ -129,7 +162,7 @@ const CollectionQueryPage: React.FC = () => {
       key: 'description',
     },
     {
-      title: '数据所有者',
+      title: '集合管理员',
       dataIndex: 'datatype_owner',
       key: 'datatype_owner',
     },
@@ -152,7 +185,7 @@ const CollectionQueryPage: React.FC = () => {
             编辑
           </Button>
           <Popconfirm
-            title="确定要删除此集合吗？删除后将同时删除所有相关数据"
+            title="确定要删除此集合吗？将级联删除所有关联数据（角色、权限、字段定义、业务数据）"
             onConfirm={() => handleDeleteCollection(record.module)}
             okText="确定"
             cancelText="取消"
@@ -178,7 +211,7 @@ const CollectionQueryPage: React.FC = () => {
           </Space>
         }
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalVisible(true)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
             创建集合
           </Button>
         }
@@ -232,9 +265,19 @@ const CollectionQueryPage: React.FC = () => {
           </Form.Item>
           <Form.Item
             name="datatype_owner"
-            label="数据类型所有者"
+            label="集合管理员（必选）"
+            rules={[{ required: true, message: '请选择集合管理员' }]}
+            tooltip="被选中的用户将自动获得集合管理员权限"
           >
-            <Input placeholder="请输入所有者ID" />
+            <Select
+              showSearch
+              placeholder="请搜索并选择用户"
+              filterOption={filterOption}
+              options={users.map(u => ({
+                label: `${u.username} (${u.email})`,
+                value: u.username
+              }))}
+            />
           </Form.Item>
           <Form.Item>
             <Space style={{ justifyContent: 'flex-end' }}>
@@ -273,9 +316,17 @@ const CollectionQueryPage: React.FC = () => {
           </Form.Item>
           <Form.Item
             name="datatype_owner"
-            label="数据类型所有者"
+            label="集合管理员"
           >
-            <Input placeholder="请输入所有者ID" />
+            <Select
+              showSearch
+              placeholder="请搜索并选择用户"
+              filterOption={filterOption}
+              options={users.map(u => ({
+                label: `${u.username} (${u.email})`,
+                value: u.username
+              }))}
+            />
           </Form.Item>
           <Form.Item>
             <Space style={{ justifyContent: 'flex-end' }}>

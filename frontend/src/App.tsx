@@ -14,6 +14,7 @@ const ScraperCenter = lazy(() => import('./pages/Admin/ScraperCenter'))
 const DeletedScraperPage = lazy(() => import('./pages/Admin/DeletedScraperPage'))
 const CollectionQueryPage = lazy(() => import('./pages/Admin/CollectionQueryPage'))
 const CustomFieldsPage = lazy(() => import('./pages/Admin/CustomFieldsPage'))
+const TestResultsPage = lazy(() => import('./pages/Admin/TestResultsPage'))
 
 const ProtectedRoute: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -54,6 +55,7 @@ function App() {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="permissions" element={<PermissionManagement />} />
+                <Route path="test-results" element={<TestResultsPage />} />
               </Route>
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />

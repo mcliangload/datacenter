@@ -79,7 +79,19 @@ func main() {
 	rbacService := rbac.NewService(rbacStorage)
 	fmt.Println("7.5 RBAC服务初始化完成")
 
-	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem, jwtService, rbacService)
+	collectionRBACStorage, err := storage.NewCollectionRBACStorage(
+		getEnv("MONGODB_RBAC_URI", "mongodb://localhost:27017"),
+		getEnv("MONGODB_RBAC_DATABASE", "rbac"),
+	)
+	if err != nil {
+		panic("Failed to initialize collection RBAC storage: " + err.Error())
+	}
+	fmt.Println("7.6 集合RBAC存储初始化完成")
+
+	collectionRBACService := rbac.NewCollectionRBACService(rbacStorage, collectionRBACStorage)
+	fmt.Println("7.7 集合RBAC服务初始化完成")
+
+	handler := api.NewHandler(businessStorage, rbacStorage, scraperSystem, jwtService, rbacService, collectionRBACStorage, collectionRBACService)
 	fmt.Println("8. API处理器初始化完成")
 
 	gin.SetMode(gin.ReleaseMode)

@@ -318,3 +318,47 @@ type Collection struct {
 	DatatypeOwner  string `json:"datatype_owner" bson:"datatype_owner"`
 	CollectionName string `json:"collection_name" bson:"collection_name"`
 }
+
+const (
+	CollectionRoleTypeOwner    = "owner"
+	CollectionRoleTypeOperator = "operator"
+	CollectionRoleTypeTourist  = "tourist"
+)
+
+type CollectionRole struct {
+	ID               primitive.ObjectID `json:"_id" bson:"_id"`
+	CreatedBy        string             `json:"created_by" bson:"created_by"`
+	CreatedAt        time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedBy        string             `json:"updated_by" bson:"updated_by"`
+	UpdatedAt        time.Time          `json:"updated_at" bson:"updated_at"`
+	CollectionModule string             `json:"collection_module" bson:"collection_module"`
+	Name             string             `json:"name" bson:"name"`
+	Code             string             `json:"code" bson:"code"`
+	Type             string             `json:"type" bson:"type"`
+	Description      string             `json:"description" bson:"description"`
+	PermissionIDs    []string           `json:"permission_ids" bson:"permission_ids"`
+}
+
+type CollectionRoleAssignment struct {
+	ID               primitive.ObjectID `json:"_id" bson:"_id"`
+	CreatedBy        string             `json:"created_by" bson:"created_by"`
+	CreatedAt        time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedBy        string             `json:"updated_by" bson:"updated_by"`
+	UpdatedAt        time.Time          `json:"updated_at" bson:"updated_at"`
+	UserID           string             `json:"user_id" bson:"user_id"`
+	CollectionModule string             `json:"collection_module" bson:"collection_module"`
+	CollectionRoleID string             `json:"collection_role_id" bson:"collection_role_id"`
+}
+
+type AuditLog struct {
+	ID         primitive.ObjectID `json:"_id" bson:"_id"`
+	Timestamp  time.Time          `json:"timestamp" bson:"timestamp"`
+	UserID     string             `json:"user_id" bson:"user_id"`
+	Username   string             `json:"username" bson:"username"`
+	Action     string             `json:"action" bson:"action"`
+	Resource   string             `json:"resource" bson:"resource"`
+	ResourceID string             `json:"resource_id" bson:"resource_id"`
+	Details    string             `json:"details" bson:"details"`
+	IPAddress  string             `json:"ip_address" bson:"ip_address"`
+	UserAgent  string             `json:"user_agent" bson:"user_agent"`
+}

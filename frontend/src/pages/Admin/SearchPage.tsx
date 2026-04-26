@@ -1,8 +1,7 @@
 import { Button, Card, Table, message, Space, Modal, Form, Input, Select, Popconfirm, Tag, Tooltip } from 'antd'
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { ReloadOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import apiClient from '../../services/api'
-import { jqlExamples } from '../../services/jql'
 import './SearchPage.css'
 
 interface BusinessData {
@@ -70,6 +69,7 @@ const SearchPage: React.FC = () => {
   const [editForm] = Form.useForm()
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 })
+  const paginationRef = useRef({ current: 1, pageSize: 10, total: 0 })
 
   const fetchCollections = useCallback(async () => {
     try {
@@ -100,27 +100,32 @@ const SearchPage: React.FC = () => {
     }
   }, [module])
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (jql?: string) => {
     if (!module) return
     setLoading(true)
     try {
-      let url = `/api/business/module/${module}?page=${pagination.current}&pageSize=${pagination.pageSize}`
-      if (jqlQuery) {
-        url += `&jql=${encodeURIComponent(jqlQuery)}`
+      const p = paginationRef.current
+      const query = jql !== undefined ? jql : jqlQuery
+      let url = `/api/business/module/${module}?page=${p.current}&pageSize=${p.pageSize}`
+      if (query) {
+        url += `&jql=${encodeURIComponent(query)}`
       }
       const response = await apiClient.get(url)
       setData(response.data.data || [])
       if (response.data.total !== undefined) {
-        setPagination(prev => ({ ...prev, total: response.data.total }))
+        setPagination(prev => {
+          const next = { ...prev, total: response.data.total }
+          paginationRef.current = next
+          return next
+        })
       }
     } catch (error: any) {
       console.error('获取业务数据失败', error)
-      message.error(error?.response?.data?.error || '获取业务数据失败')
       setData([])
     } finally {
       setLoading(false)
     }
-  }, [module, jqlQuery, pagination.current, pagination.pageSize])
+  }, [module])
 
   useEffect(() => {
     fetchCollections()
@@ -136,7 +141,7 @@ const SearchPage: React.FC = () => {
     if (module) {
       fetchData()
     }
-  }, [module, fetchData])
+  }, [module])
 
   const dynamicFields = useMemo((): DynamicField[] => {
     if (fieldDefinitions.length > 0) {
@@ -172,26 +177,28 @@ const SearchPage: React.FC = () => {
   }, [fieldDefinitions, data])
 
   const handleSearch = () => {
-    setPagination(prev => ({ ...prev, current: 1 }))
-    fetchData()
+    const newPage = { ...paginationRef.current, current: 1 }
+    paginationRef.current = newPage
+    setPagination(newPage)
+    fetchData(jqlQuery)
   }
 
   const handleRefresh = () => {
-    fetchData()
+    fetchData(jqlQuery)
   }
 
   const handleTableChange = (paginationConfig: any) => {
-    setPagination(prev => ({
-      ...prev,
-      current: paginationConfig.current,
-      pageSize: paginationConfig.pageSize
-    }))
+    const newPage = { current: paginationConfig.current, pageSize: paginationConfig.pageSize, total: paginationRef.current.total }
+    paginationRef.current = newPage
+    setPagination(newPage)
   }
 
   const handleModuleChange = (newModule: string) => {
     setModule(newModule)
     setJqlQuery('')
-    setPagination(prev => ({ ...prev, current: 1 }))
+    const newPage = { current: 1, pageSize: paginationRef.current.pageSize, total: 0 }
+    paginationRef.current = newPage
+    setPagination(newPage)
   }
 
   const handleCreateData = async (values: any) => {
@@ -470,18 +477,6 @@ const SearchPage: React.FC = () => {
             <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
               刷新
             </Button>
-          </Space>
-          <Space wrap>
-            <span style={{ color: '#666' }}>JQL示例:</span>
-            {jqlExamples.slice(0, 5).map((example, index) => (
-              <Tag
-                key={index}
-                style={{ cursor: 'pointer' }}
-                onClick={() => setJqlQuery(example)}
-              >
-                {example.length > 30 ? example.substring(0, 30) + '...' : example}
-              </Tag>
-            ))}
           </Space>
         </Space>
       </Card>

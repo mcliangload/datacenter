@@ -39,7 +39,8 @@ const AdminLayout: React.FC = () => {
         'roles': '角色管理',
         'permissions': '权限管理',
         'scraper': '刮削中心',
-        'data-management': '数据管理'
+        'data-management': '数据管理',
+        'test-results': '测试结果'
       }
 
       if (titleMap[segment]) {
@@ -136,6 +137,11 @@ const AdminLayout: React.FC = () => {
           key: 'permissions',
           label: '权限管理',
           onClick: () => navigate('/admin/permissions'),
+        },
+        {
+          key: 'test-results',
+          label: '测试结果',
+          onClick: () => navigate('/admin/test-results'),
         },
       ],
     },

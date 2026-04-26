@@ -12,7 +12,7 @@
 - 提供灵活的业务数据管理能力，支持动态字段定义和数据模型扩展
 - 实现异步数据刮削系统，支持高并发任务处理
 - 提供RESTful API，支持前端SPA应用访问
-- 实现完整的日志记录和审计功能
+- 实现完整的日志记录功能
 
 ### 1.3 适用范围
 
@@ -29,8 +29,9 @@
 | 功能 | 描述 |
 |------|------|
 | 用户名密码认证 | 支持用户名+密码登录，使用bcrypt密码哈希 |
-| JWT Token | 登录成功后返回JWT Token，有效期24小时 |
-| Token刷新 | 支持Token刷新机制，刷新Token有效期30天 |
+| JWT Token | 登录成功后返回JWT Token，默认有效期24小时 |
+| Token刷新 | 支持Token刷新机制，默认刷新有效期720小时(30天) |
+| 用户注册 | 支持新用户注册 |
 
 #### 2.1.2 认证流程
 
@@ -47,7 +48,7 @@
 | 功能 | 描述 |
 |------|------|
 | 用户CRUD | 创建、读取、更新、删除用户 |
-| 用户列表 | 分页获取用户列表，支持关键词搜索 |
+| 用户列表 | 分页获取用户列表 |
 | 角色分配 | 为用户分配/移除角色，支持多角色 |
 | 用户详情 | 获取用户详细信息及关联角色 |
 
@@ -58,19 +59,11 @@
 | username | string | 是 | 用户名，唯一 |
 | email | string | 是 | 邮箱，唯一 |
 | password | string | 是 | 密码，bcrypt加密 |
-| phone | string | 否 | 电话号码 |
-| address | string | 否 | 地址 |
 | role_ids | string[] | 否 | 关联角色ID数组 |
 | created_by | string | 否 | 创建人 |
 | created_at | datetime | 否 | 创建时间 |
 | updated_by | string | 否 | 更新人 |
 | updated_at | datetime | 否 | 更新时间 |
-
-#### 2.2.3 验证规则
-
-- 用户名唯一，长度3-50字符
-- 邮箱格式正确，唯一
-- 密码至少8位
 
 ### 2.3 角色管理
 
@@ -96,14 +89,6 @@
 | updated_by | string | 否 | 更新人 |
 | updated_at | datetime | 否 | 更新时间 |
 
-#### 2.3.3 内置角色
-
-| 角色代码 | 角色名称 | 描述 |
-|----------|----------|------|
-| admin | 超级管理员 | 拥有所有权限 |
-| user | 普通用户 | 基础操作权限 |
-| read_only | 只读用户 | 仅查看权限 |
-
 ### 2.4 权限管理
 
 #### 2.4.1 功能列表
@@ -111,7 +96,7 @@
 | 功能 | 描述 |
 |------|------|
 | 权限CRUD | 创建、读取、更新、删除权限 |
-| 权限列表 | 分页获取权限列表，支持模块筛选 |
+| 权限列表 | 分页获取权限列表 |
 | 权限详情 | 获取权限详细信息 |
 
 #### 2.4.2 权限属性
@@ -121,28 +106,38 @@
 | name | string | 是 | 权限名称 |
 | code | string | 是 | 权限代码，格式：模块:操作 |
 | description | string | 否 | 权限描述 |
-| module | string | 否 | 所属模块 |
 | created_by | string | 否 | 创建人 |
 | created_at | datetime | 否 | 创建时间 |
 | updated_by | string | 否 | 更新人 |
 | updated_at | datetime | 否 | 更新时间 |
 
-#### 2.4.3 内置权限
+#### 2.4.3 权限代码格式
 
-| 权限代码 | 权限名称 | 模块 |
-|----------|----------|------|
-| user:* | 用户完全控制 | user |
-| user:read | 查看用户 | user |
-| user:write | 管理用户 | user |
-| role:* | 角色完全控制 | role |
-| role:read | 查看角色 | role |
-| role:write | 管理角色 | role |
-| permission:* | 权限完全控制 | permission |
-| permission:read | 查看权限 | permission |
-| permission:write | 管理权限 | permission |
-| data:* | 数据完全控制 | data |
-| data:read | 查看数据 | data |
-| data:write | 管理数据 | data |
+系统使用基于资源的权限代码格式，支持通配符：
+
+| 权限代码 | 描述 |
+|----------|------|
+| user:* | 用户完全控制 |
+| user:read | 查看用户 |
+| user:write | 管理用户 |
+| role:* | 角色完全控制 |
+| role:read | 查看角色 |
+| role:write | 管理角色 |
+| permission:* | 权限完全控制 |
+| permission:read | 查看权限 |
+| permission:write | 管理权限 |
+| data:* | 数据完全控制 |
+| data:read | 查看数据 |
+| data:write | 管理数据 |
+| field:* | 字段完全控制 |
+| field:read | 查看字段 |
+| field:write | 管理字段 |
+| scrape:* | 刮削完全控制 |
+| scrape:read | 查看刮削任务 |
+| scrape:write | 管理刮削任务 |
+| collection:* | 集合完全控制 |
+| collection:read | 查看集合 |
+| collection:write | 管理集合 |
 
 ### 2.5 业务数据管理
 
@@ -156,40 +151,144 @@
 | 业务数据CRUD | 各模块业务数据的增删改查 |
 | 软删除 | 支持数据软删除，可恢复 |
 | JQL查询 | 支持类JQL语法查询数据 |
+| 集合RBAC | 每个集合独立的基于角色的访问控制系统 |
 
 #### 2.5.2 字段定义属性
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | module | string | 是 | 所属模块 |
-| name | string | 是 | 字段名称 |
-| code | string | 是 | 字段代码 |
-| type | string | 是 | 字段类型(string/number/date/boolean) |
+| field_name | string | 是 | 字段名称 |
+| field_type | string | 是 | 字段类型(string/number/boolean/date/array/object) |
+| description | string | 否 | 字段描述 |
 | required | boolean | 否 | 是否必填 |
 | default_value | any | 否 | 默认值 |
-| description | string | 否 | 字段描述 |
+| constraints | object | 否 | 字段约束 |
 
 #### 2.5.3 集合属性
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| name | string | 是 | 集合名称 |
-| code | string | 是 | 集合代码 |
+| module | string | 是 | 模块名称 |
 | description | string | 否 | 集合描述 |
-| fields | object | 否 | 字段定义 |
+| datatype_owner | string | 否 | 数据类型所有者 |
+| collection_name | string | 是 | MongoDB集合名称 |
 
 #### 2.5.4 业务数据属性
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | module | string | 是 | 所属模块 |
-| data | object | 是 | 业务数据 |
+| description | string | 否 | 描述信息 |
+| custom_fields | object | 否 | 自定义字段 |
+| file_path | string | 否 | 文件路径 |
 | created_by | string | 否 | 创建人 |
 | created_at | datetime | 否 | 创建时间 |
 | updated_by | string | 否 | 更新人 |
 | updated_at | datetime | 否 | 更新时间 |
 
-### 2.6 数据刮削系统
+### 2.6 集合特定RBAC系统
+
+#### 2.6.1 功能列表
+
+| 功能 | 描述 |
+|------|------|
+| 自动角色创建 | 创建新集合时自动创建管理员、操作员、普通用户三种角色 |
+| 集合角色分配 | 为用户分配集合级别的角色 |
+| 权限检查 | 集合数据访问时进行权限验证 |
+| 审计日志 | 记录角色分配和权限变更操作 |
+| 超级管理员权限 | 拥有system:admin权限的用户可以访问所有集合 |
+
+#### 2.6.2 集合角色类型
+
+| 角色类型 | 代码 | 权限 |
+|----------|------|------|
+| 集合管理员 | admin | collection:admin, collection:read, collection:write, collection:delete, collection:field:admin |
+| 集合操作员 | operator | collection:read, collection:write, collection:delete |
+| 集合普通用户 | user | collection:read |
+
+#### 2.6.3 集合权限代码格式
+
+| 权限代码 | 描述 |
+|----------|------|
+| collection:admin | 集合管理权限（包含所有其他集合权限） |
+| collection:read | 查看集合数据 |
+| collection:write | 创建和更新集合数据 |
+| collection:delete | 删除集合数据 |
+| collection:field:admin | 管理集合字段定义 |
+
+#### 2.6.4 集合角色属性
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| collection_module | string | 是 | 所属集合模块 |
+| name | string | 是 | 角色名称 |
+| code | string | 是 | 角色代码 |
+| type | string | 是 | 角色类型(admin/operator/user) |
+| description | string | 否 | 角色描述 |
+| permission_ids | string[] | 否 | 关联权限ID数组 |
+| created_by | string | 否 | 创建人 |
+| created_at | datetime | 否 | 创建时间 |
+| updated_by | string | 否 | 更新人 |
+| updated_at | datetime | 否 | 更新时间 |
+
+#### 2.6.5 集合角色分配属性
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| user_id | string | 是 | 用户ID |
+| collection_module | string | 是 | 集合模块 |
+| collection_role_id | string | 是 | 集合角色ID |
+| created_by | string | 否 | 创建人 |
+| created_at | datetime | 否 | 创建时间 |
+| updated_by | string | 否 | 更新人 |
+| updated_at | datetime | 否 | 更新时间 |
+
+#### 2.6.6 集合角色分配规则
+
+- 集合管理员角色只能由超级管理员分配
+- 每个集合只能有一个管理员
+- 集合操作员角色由管理员或超级管理员分配
+- 集合普通用户角色由管理员或超级管理员分配
+
+#### 2.6.7 审计日志属性
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| user_id | string | 是 | 操作者用户ID |
+| username | string | 是 | 操作者用户名 |
+| action | string | 是 | 操作类型 |
+| resource | string | 是 | 资源类型 |
+| resource_id | string | 是 | 资源ID |
+| details | string | 否 | 操作详情 |
+| ip_address | string | 否 | IP地址 |
+| user_agent | string | 否 | 用户代理 |
+| timestamp | datetime | 否 | 操作时间 |
+
+#### 2.6.8 集合RBAC API接口
+
+| 接口 | 方法 | 描述 |
+|------|------|------|
+| /api/collections/{module}/roles | GET | 获取集合的所有角色 |
+| /api/collections/{module}/roles/assignments | GET | 获取集合的角色分配列表 |
+| /api/collections/{module}/roles/assign | POST | 为用户分配集合角色 |
+| /api/collections/{module}/roles/{roleId}/assignments/{userId} | DELETE | 移除用户的集合角色 |
+| /api/collections/{module}/audit-logs | GET | 获取集合的审计日志 |
+| /api/collection-data/module/{module}/* | * | 集合数据访问接口（需集合权限） |
+
+#### 2.6.9 集合数据访问权限检查流程
+
+```
+1. 用户请求集合数据接口（如 GET /api/collection-data/module/test_collection）
+2. 中间件提取用户ID
+3. 检查用户是否拥有system:admin全局权限
+   - 如果有，则允许访问
+4. 检查用户在集合中的角色分配
+5. 检查用户角色是否具有所需权限
+6. 有权限则放行，无权限返回403
+```
+
+### 2.7 数据刮削系统
 
 #### 2.6.1 功能列表
 
@@ -201,28 +300,29 @@
 | 任务重试 | 失败任务支持重试 |
 | 任务软删除 | 删除任务移动到deleted_scrape_tasks集合 |
 | 任务恢复 | 从deleted_scrape_tasks恢复任务 |
+| 批量删除 | 支持批量删除刮削任务 |
 
 #### 2.6.2 刮削任务属性
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| task_id | string | 是 | 任务ID |
 | module | string | 是 | 所属模块 |
-| url | string | 是 | 刮削URL |
+| data_path | string | 是 | 数据文件路径 |
+| scraper_path | string | 是 | 刮削器脚本路径 |
 | status | string | 否 | 任务状态 |
-| retry_count | int | 否 | 重试次数 |
-| max_retries | int | 否 | 最大重试次数 |
+| result | object | 否 | 刮削结果 |
 | error_message | string | 否 | 错误信息 |
-| created_at | datetime | 否 | 创建时间 |
 | started_at | datetime | 否 | 开始时间 |
-| finished_at | datetime | 否 | 完成时间 |
+| completed_at | datetime | 否 | 完成时间 |
+| business_data_id | string | 否 | 关联的业务数据ID |
+| description | string | 否 | 任务描述 |
 
 #### 2.6.3 任务状态流
 
 ```
 pending → scraping → success
               ↓
-            failed → (重试) → scraping
+            failed → (重试) → pending
 ```
 
 ### 2.7 日志系统
@@ -233,7 +333,6 @@ pending → scraping → success
 |----------|------|------|
 | HTTP日志 | logs/http.log | API请求响应记录 |
 | 应用日志 | logs/app.log | 程序运行日志 |
-| 刮削日志 | logs/scraper.log | 刮削任务执行记录 |
 
 #### 2.7.2 日志格式
 
@@ -264,27 +363,25 @@ pending → scraping → success
 
 | 项目 | 要求 |
 |------|------|
-| 密码加密 | bcrypt，cost factor 10 |
-| JWT安全 | HS256签名，24小时有效期 |
+| 密码加密 | bcrypt加密 |
+| JWT安全 | HS256签名，默认24小时有效期 |
 | 输入验证 | 所有输入参数验证 |
-| SQL注入 | 防止NoSQL注入 |
 | CORS | 支持跨域配置 |
 
 ### 3.3 可靠性需求
 
 | 项目 | 要求 |
 |------|------|
-| 日志轮转 | 单文件100MB，保留5个备份 |
+| 日志轮转 | 单文件100MB，保留5个备份，30天保留 |
 | 错误处理 | 统一错误响应格式 |
 | 软删除 | 数据可恢复 |
-| 任务重试 | 失败任务自动重试3次 |
+| 任务队列 | 队列大小1000 |
 
 ### 3.4 可维护性需求
 
 | 项目 | 要求 |
 |------|------|
 | 代码结构 | 分层架构，模块化 |
-| 注释 | 公共接口注释 |
 | 配置 | 环境变量配置 |
 | 文档 | API文档 |
 
@@ -294,9 +391,8 @@ pending → scraping → success
 
 ```json
 {
-  "code": 200,
-  "message": "success",
-  "data": { ... }
+  "data": {...},
+  "message": "success"
 }
 ```
 
@@ -304,8 +400,7 @@ pending → scraping → success
 
 ```json
 {
-  "code": 400,
-  "message": "error message"
+  "error": "error message"
 }
 ```
 
@@ -314,6 +409,7 @@ pending → scraping → success
 | 状态码 | 说明 |
 |--------|------|
 | 200 | 成功 |
+| 201 | 创建成功 |
 | 400 | 请求参数错误 |
 | 401 | 未认证 |
 | 403 | 无权限 |
@@ -322,14 +418,7 @@ pending → scraping → success
 
 ## 5. 数据字典
 
-### 5.1 用户状态
-
-| 状态码 | 状态名称 | 说明 |
-|--------|----------|------|
-| active | 活跃 | 正常使用的用户 |
-| inactive | 非活跃 | 被禁用的用户 |
-
-### 5.2 任务状态
+### 5.1 任务状态
 
 | 状态码 | 状态名称 | 说明 |
 |--------|----------|------|
@@ -338,16 +427,18 @@ pending → scraping → success
 | success | 成功 | 任务成功完成 |
 | failed | 失败 | 任务处理失败 |
 
-### 5.3 权限模块
+### 5.2 字段类型
 
-| 模块代码 | 模块名称 | 说明 |
+| 类型代码 | 类型名称 | 说明 |
 |----------|----------|------|
-| user | 用户管理 | 用户相关权限 |
-| role | 角色管理 | 角色相关权限 |
-| permission | 权限管理 | 权限相关权限 |
-| data | 数据管理 | 数据相关权限 |
+| string | 字符串 | 字符串类型 |
+| number | 数字 | 数字类型 |
+| boolean | 布尔 | 布尔类型 |
+| date | 日期 | 日期类型 |
+| array | 数组 | 数组类型 |
+| object | 对象 | 对象类型 |
 
-### 5.4 数据库集合
+### 5.3 数据库集合
 
 #### datacenter 数据库
 
@@ -378,7 +469,7 @@ pending → scraping → success
 3. 后端验证用户名密码
 4. 验证成功，生成JWT Token
 5. 返回Token给前端
-6. 前端存储Token到localStorage
+6. 前端存储Token
 7. 后续请求携带Token
 ```
 
@@ -389,46 +480,33 @@ pending → scraping → success
 2. 中间件提取Token
 3. 验证Token有效性
 4. 解析用户信息和权限
-5. 检查所需权限
+5. 检查所需权限（支持通配符匹配）
 6. 有权限则放行，无权限返回403
 ```
 
 ### 6.3 数据刮削流程
 
 ```
-1. 用户提交业务数据
-2. 系统保存数据到MongoDB
-3. 创建刮削任务，状态为pending
-4. 任务放入队列
-5. 工作协程取出任务
-6. 更新任务状态为scraping
-7. 执行刮削逻辑
-8. 更新任务状态为success/failed
-9. 如失败且未超过最大重试次数，重新入队
+1. 用户提交刮削任务
+2. 创建刮削任务，状态为pending
+3. 任务放入队列
+4. 工作协程取出任务
+5. 更新任务状态为scraping
+6. 执行刮削器脚本
+7. 更新任务状态为success/failed
+8. 成功时存储结果到业务数据集合
 ```
 
 ### 6.4 数据删除/恢复流程
 
 ```
 1. 用户发起删除请求
-2. 系统将数据移动到deleted_data或deleted_scrape_tasks集合
+2. 系统将数据移动到deleted_data集合
 3. 保留原始数据的所有信息
 4. 用户可查询已删除数据列表
 5. 用户发起恢复请求
 6. 系统将数据从deleted集合恢复到原始集合
 7. 删除deleted集合中的记录
-```
-
-### 6.5 刮削任务删除/恢复流程
-
-```
-1. 用户发起刮削任务删除请求
-2. 系统将任务移动到deleted_scrape_tasks集合
-3. 保留原始任务的所有信息
-4. 用户可查询已删除任务列表
-5. 用户发起恢复请求
-6. 系统将任务恢复到scrape_tasks集合
-7. 删除deleted_scrape_tasks中的记录
 ```
 
 ## 7. 风险与约束

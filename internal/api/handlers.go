@@ -21,20 +21,24 @@ import (
 )
 
 type Handler struct {
-	storage     storage.Storage
-	rbacStorage storage.RBACStorage
-	scraper     scraper.Scraper
-	jwtService  auth.JWTService
-	rbacService *rbac.Service
+	storage               storage.Storage
+	rbacStorage           storage.RBACStorage
+	scraper               scraper.Scraper
+	jwtService            auth.JWTService
+	rbacService           *rbac.Service
+	collectionRBACStorage storage.CollectionRBACStorage
+	collectionRBACService *rbac.CollectionRBACService
 }
 
-func NewHandler(storage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper, jwtService auth.JWTService, rbacService *rbac.Service) *Handler {
+func NewHandler(storage storage.Storage, rbacStorage storage.RBACStorage, scraper scraper.Scraper, jwtService auth.JWTService, rbacService *rbac.Service, collectionRBACStorage storage.CollectionRBACStorage, collectionRBACService *rbac.CollectionRBACService) *Handler {
 	return &Handler{
-		storage:     storage,
-		rbacStorage: rbacStorage,
-		scraper:     scraper,
-		jwtService:  jwtService,
-		rbacService: rbacService,
+		storage:               storage,
+		rbacStorage:           rbacStorage,
+		scraper:               scraper,
+		jwtService:            jwtService,
+		rbacService:           rbacService,
+		collectionRBACStorage: collectionRBACStorage,
+		collectionRBACService: collectionRBACService,
 	}
 }
 
@@ -82,23 +86,49 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		}
 
 		fields := protected.Group("/fields")
-		fields.Use(h.PermissionMiddleware(rbac.PermissionFieldRead))
 		{
-			fields.GET("/module/:module", h.GetFieldDefinitionsByModule)
-			fields.GET("/:id", h.GetFieldDefinitionByID)
-			fields.POST("", h.CreateFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
-			fields.PUT("/:id", h.UpdateFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
-			fields.DELETE("/:id", h.DeleteFieldDefinition).Use(h.PermissionMiddleware(rbac.PermissionFieldWrite))
+			fields.GET("/module/:module",
+				CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionRead),
+				h.GetFieldDefinitionsByModule)
+			fields.GET("/:id", h.PermissionMiddleware(rbac.PermissionFieldRead), h.GetFieldDefinitionByID)
+			fields.POST("",
+				CollectionPermissionMiddlewareFromBody(h.collectionRBACService, rbac.CollectionPermissionFieldAdmin),
+				h.CreateFieldDefinition)
+			fields.PUT("/:id",
+				CollectionPermissionFieldAdminMiddleware(h.collectionRBACService, h.storage),
+				h.UpdateFieldDefinition)
+			fields.DELETE("/:id",
+				CollectionPermissionFieldAdminMiddleware(h.collectionRBACService, h.storage),
+				h.DeleteFieldDefinition)
 		}
 
 		business := protected.Group("/business")
-		business.Use(h.PermissionMiddleware(rbac.PermissionDataRead))
 		{
-			business.POST("", h.CreateBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
-			business.GET("/module/:module", h.GetBusinessDataByModule)
-			business.GET("/module/:module/:id", h.GetBusinessDataByID)
-			business.PUT("/module/:module/:id", h.UpdateBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
-			business.DELETE("/module/:module/:id", h.DeleteBusinessData).Use(h.PermissionMiddleware(rbac.PermissionDataWrite))
+			business.POST("",
+				CollectionPermissionMiddlewareFromBody(h.collectionRBACService, rbac.CollectionPermissionWrite),
+				h.CreateBusinessData)
+			business.GET("/module/:module",
+				CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionRead),
+				h.GetBusinessDataByModule)
+			business.GET("/module/:module/:id",
+				CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionRead),
+				h.GetBusinessDataByID)
+			business.PUT("/module/:module/:id",
+				CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionWrite),
+				h.UpdateBusinessData)
+			business.DELETE("/module/:module/:id",
+				CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionDelete),
+				h.DeleteBusinessData)
+		}
+
+		businessModule := protected.Group("/collection-data/module/:module")
+		businessModule.Use(CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionRead))
+		{
+			businessModule.GET("", h.GetBusinessDataByModule)
+			businessModule.GET("/:id", h.GetBusinessDataByID)
+			businessModule.POST("", h.CreateBusinessData).Use(CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionWrite))
+			businessModule.PUT("/:id", h.UpdateBusinessData).Use(CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionWrite))
+			businessModule.DELETE("/:id", h.DeleteBusinessData).Use(CollectionPermissionMiddleware(h.collectionRBACService, rbac.CollectionPermissionDelete))
 		}
 
 		deleted := protected.Group("/deleted")
@@ -139,6 +169,13 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 			collections.POST("/:module/indexes", h.CreateCollectionIndex).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
 			collections.GET("/:module/indexes", h.GetCollectionIndexes)
 			collections.DELETE("/:module/indexes/:name", h.DeleteCollectionIndex).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+
+			// 集合RBAC路由
+			collections.GET("/:module/roles", h.GetCollectionRoles)
+			collections.GET("/:module/roles/assignments", h.GetCollectionRoleAssignments)
+			collections.POST("/:module/roles/assign", h.AssignCollectionRole).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+			collections.DELETE("/:module/roles/:roleId/assignments/:userId", h.RemoveCollectionRoleAssignment).Use(h.PermissionMiddleware(rbac.PermissionCollectionWrite))
+			collections.GET("/:module/audit-logs", h.GetCollectionAuditLogs)
 		}
 	}
 }
@@ -257,39 +294,43 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 
 func (h *Handler) PermissionMiddleware(requiredPerm rbac.Permission) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		perms, exists := c.Get("permissions")
+		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No permissions found"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "No user ID found"})
 			c.Abort()
 			return
 		}
 
-		permList, ok := perms.([]string)
-		if !ok {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid permissions format"})
+		// 使用RBAC服务检查权限，包括超级管理员权限
+		hasPermission, err := h.rbacService.CheckPermission(c.Request.Context(), userID.(string), requiredPerm)
+		if err != nil || !hasPermission {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied: " + string(requiredPerm)})
 			c.Abort()
 			return
 		}
 
-		required := string(requiredPerm)
-		for _, p := range permList {
-			if p == required || (strings.HasSuffix(p, ":*") && strings.HasPrefix(required, strings.TrimSuffix(p, "*"))) {
-				c.Next()
-				return
-			}
-		}
-
-		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied: " + required})
-		c.Abort()
+		c.Next()
 	}
 }
 
 func (h *Handler) GetUsers(c *gin.Context) {
-	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "10"), 10, 64)
-	skip := (page - 1) * pageSize
+	// 支持两种参数格式：page/pageSize 和 skip/limit
+	skip, _ := strconv.ParseInt(c.DefaultQuery("skip", "0"), 10, 64)
+	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
 
-	users, err := h.rbacStorage.GetUsers(skip, pageSize)
+	// 如果提供了 page 和 pageSize 参数，则使用它们
+	if pageStr := c.Query("page"); pageStr != "" {
+		if page, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
+			if pageSizeStr := c.Query("pageSize"); pageSizeStr != "" {
+				if pageSize, err := strconv.ParseInt(pageSizeStr, 10, 64); err == nil {
+					skip = (page - 1) * pageSize
+					limit = pageSize
+				}
+			}
+		}
+	}
+
+	users, err := h.rbacStorage.GetUsers(skip, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -305,11 +346,14 @@ func (h *Handler) GetUsers(c *gin.Context) {
 		users[i].Password = ""
 	}
 
+	// 计算当前页码
+	page := skip/limit + 1
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":     users,
 		"total":    total,
 		"page":     page,
-		"pageSize": pageSize,
+		"pageSize": limit,
 	})
 }
 
@@ -810,6 +854,7 @@ func (h *Handler) CreateFieldDefinition(c *gin.Context) {
 		FieldName   string              `json:"field_name" binding:"required"`
 		FieldType   string              `json:"field_type" binding:"required"`
 		Description string              `json:"description"`
+		Required    bool                `json:"required"`
 		Constraints *models.Constraints `json:"constraints"`
 	}
 
@@ -818,11 +863,16 @@ func (h *Handler) CreateFieldDefinition(c *gin.Context) {
 		return
 	}
 
+	if req.Constraints == nil {
+		req.Constraints = &models.Constraints{}
+	}
+
 	field := &models.FieldDefinition{
 		Module:      req.Module,
 		FieldName:   req.FieldName,
 		FieldType:   models.FieldType(req.FieldType),
 		Description: req.Description,
+		Required:    req.Required,
 		Constraints: *req.Constraints,
 	}
 
@@ -841,6 +891,7 @@ func (h *Handler) UpdateFieldDefinition(c *gin.Context) {
 		FieldName   string              `json:"field_name"`
 		FieldType   string              `json:"field_type"`
 		Description string              `json:"description"`
+		Required    *bool               `json:"required"`
 		Constraints *models.Constraints `json:"constraints"`
 	}
 
@@ -863,6 +914,9 @@ func (h *Handler) UpdateFieldDefinition(c *gin.Context) {
 	}
 	if req.Description != "" {
 		field.Description = req.Description
+	}
+	if req.Required != nil {
+		field.Required = *req.Required
 	}
 	if req.Constraints != nil {
 		field.Constraints = *req.Constraints
@@ -971,6 +1025,7 @@ func (h *Handler) GetBusinessDataByModule(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JQL query: " + err.Error()})
 			return
 		}
+		filter = prefixCustomFields(filter)
 	}
 
 	dataList, err := h.storage.GetBusinessDataByModule(module, filter, skip, pageSize)
@@ -1368,7 +1423,7 @@ func (h *Handler) CreateCollection(c *gin.Context) {
 	var req struct {
 		Module        string `json:"module" binding:"required"`
 		Description   string `json:"description"`
-		DatatypeOwner string `json:"datatype_owner"`
+		DatatypeOwner string `json:"datatype_owner" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1390,11 +1445,35 @@ func (h *Handler) CreateCollection(c *gin.Context) {
 		collection.CreatedBy = "unknown"
 	}
 
+	ctx := c.Request.Context()
+
 	if err := h.storage.CreateCollection(collection); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if err := h.collectionRBACService.CreateCollectionRoles(ctx, req.Module, collection.CreatedBy); err != nil {
+		h.storage.DeleteCollection(req.Module)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create collection roles: " + err.Error()})
+		return
+	}
 
+	// 自动将集合管理员角色分配给datatype_owner指定的用户
+	roles, err := h.collectionRBACService.GetCollectionRoles(ctx, req.Module)
+	if err == nil {
+		for _, role := range roles {
+			if role.Type == models.CollectionRoleTypeOwner {
+				// 尝试通过用户名查找用户
+				ownerUser, uErr := h.rbacStorage.GetUserByUsername(req.DatatypeOwner)
+				if uErr == nil && ownerUser != nil {
+					h.collectionRBACService.AssignCollectionRole(ctx, ownerUser.ID.Hex(), req.Module, role.ID.Hex(), collection.CreatedBy)
+				} else {
+					// 回退：通过创建者ID分配
+					h.collectionRBACService.AssignCollectionRole(ctx, req.DatatypeOwner, req.Module, role.ID.Hex(), collection.CreatedBy)
+				}
+				break
+			}
+		}
+	}
 	c.JSON(http.StatusCreated, collection)
 }
 
@@ -1417,6 +1496,9 @@ func (h *Handler) UpdateCollection(c *gin.Context) {
 		return
 	}
 
+	ctx := c.Request.Context()
+	oldOwner := collection.DatatypeOwner
+
 	if req.Description != "" {
 		collection.Description = req.Description
 	}
@@ -1429,11 +1511,62 @@ func (h *Handler) UpdateCollection(c *gin.Context) {
 		return
 	}
 
+	// 管理员变更时自动转移Owner角色
+	if req.DatatypeOwner != "" && req.DatatypeOwner != oldOwner {
+		roles, _ := h.collectionRBACService.GetCollectionRoles(ctx, module)
+		for _, role := range roles {
+			if role.Type == models.CollectionRoleTypeOwner {
+				// 移除旧管理员的Owner角色
+				if oldOwner != "" {
+					oldUser, uErr := h.rbacStorage.GetUserByUsername(oldOwner)
+					if uErr == nil && oldUser != nil {
+						h.collectionRBACService.RemoveCollectionRole(ctx, oldUser.ID.Hex(), module, role.ID.Hex(), "system")
+					}
+				}
+				// 赋予新管理员Owner角色
+				newUser, uErr := h.rbacStorage.GetUserByUsername(req.DatatypeOwner)
+				if uErr == nil && newUser != nil {
+					userIDStr, _ := c.Get("user_id")
+					operatorID := "system"
+					if userIDStr != nil {
+						operatorID = userIDStr.(string)
+					}
+					h.collectionRBACService.AssignCollectionRole(ctx, newUser.ID.Hex(), module, role.ID.Hex(), operatorID)
+				}
+				break
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, collection)
 }
 
 func (h *Handler) DeleteCollection(c *gin.Context) {
 	module := c.Param("module")
+	ctx := c.Request.Context()
+
+	// 删除集合角色和角色分配
+	if err := h.collectionRBACService.DeleteCollectionRoles(ctx, module); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete collection roles: " + err.Error()})
+		return
+	}
+
+	// 删除集合级权限（{module}:read, {module}:write, {module}:delete, {module}:admin, {module}:field:admin）
+	permCodes := []string{
+		module + ":read",
+		module + ":write",
+		module + ":delete",
+		module + ":admin",
+		module + ":field:admin",
+	}
+	for _, code := range permCodes {
+		perm, err := h.rbacStorage.GetPermissionByCode(code)
+		if err == nil && perm != nil {
+			h.rbacStorage.DeletePermission(perm.ID.Hex())
+		}
+	}
+
+	// 删除集合及级联数据（字段定义、业务数据、刮削任务等）
 	if err := h.storage.DeleteCollection(module); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1518,4 +1651,183 @@ func (h *Handler) DeleteCollectionIndex(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Index deleted successfully"})
+}
+
+func (h *Handler) GetCollectionRoles(c *gin.Context) {
+	module := c.Param("module")
+	roles, err := h.collectionRBACService.GetCollectionRoles(c.Request.Context(), module)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": roles})
+}
+
+func (h *Handler) GetCollectionRoleAssignments(c *gin.Context) {
+	module := c.Param("module")
+	assignments, err := h.collectionRBACService.GetCollectionRoleAssignments(c.Request.Context(), module)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	type AssignmentWithDetails struct {
+		models.CollectionRoleAssignment
+		RoleName string `json:"role_name"`
+		RoleType string `json:"role_type"`
+		UserName string `json:"user_name"`
+	}
+	var result []AssignmentWithDetails
+	for _, assignment := range assignments {
+		role, _ := h.collectionRBACStorage.GetCollectionRoleByID(assignment.CollectionRoleID)
+		user, _ := h.rbacStorage.GetUserByID(assignment.UserID)
+		detail := AssignmentWithDetails{
+			CollectionRoleAssignment: assignment,
+		}
+		if role != nil {
+			detail.RoleName = role.Name
+			detail.RoleType = role.Type
+		}
+		if user != nil {
+			detail.UserName = user.Username
+		}
+		result = append(result, detail)
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
+func (h *Handler) AssignCollectionRole(c *gin.Context) {
+	module := c.Param("module")
+	var req struct {
+		UserID string `json:"user_id" binding:"required"`
+		RoleID string `json:"role_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID, _ := c.Get("user_id")
+	operatorID := "unknown"
+	if userID != nil {
+		operatorID = userID.(string)
+	}
+	if err := h.collectionRBACService.AssignCollectionRole(c.Request.Context(), req.UserID, module, req.RoleID, operatorID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	user, _ := h.rbacStorage.GetUserByID(req.UserID)
+	username := "unknown"
+	if user != nil {
+		username = user.Username
+	}
+	h.collectionRBACService.LogAction(
+		c.Request.Context(),
+		operatorID, username, "assign_role",
+		"collection_role", req.RoleID,
+		"Assigned role "+req.RoleID+" to user "+req.UserID+" in collection "+module,
+		c.ClientIP(), c.GetHeader("User-Agent"),
+	)
+	c.JSON(http.StatusOK, gin.H{"message": "Role assigned successfully"})
+}
+
+func (h *Handler) RemoveCollectionRoleAssignment(c *gin.Context) {
+	module := c.Param("module")
+	roleId := c.Param("roleId")
+	userId := c.Param("userId")
+	userID, _ := c.Get("user_id")
+	operatorID := "unknown"
+	if userID != nil {
+		operatorID = userID.(string)
+	}
+	if err := h.collectionRBACService.RemoveCollectionRole(c.Request.Context(), userId, module, roleId, operatorID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	user, _ := h.rbacStorage.GetUserByID(userId)
+	username := "unknown"
+	if user != nil {
+		username = user.Username
+	}
+	h.collectionRBACService.LogAction(
+		c.Request.Context(),
+		operatorID, username, "remove_role",
+		"collection_role", roleId,
+		"Removed role "+roleId+" from user "+userId+" in collection "+module,
+		c.ClientIP(), c.GetHeader("User-Agent"),
+	)
+	c.JSON(http.StatusOK, gin.H{"message": "Role assignment removed successfully"})
+}
+
+func (h *Handler) GetCollectionAuditLogs(c *gin.Context) {
+	module := c.Param("module")
+	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
+	pageSize, _ := strconv.ParseInt(c.DefaultQuery("pageSize", "20"), 10, 64)
+	skip := (page - 1) * pageSize
+	logs, err := h.collectionRBACStorage.GetAuditLogsByResource("collection", module, skip, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"data": logs, "page": page, "pageSize": pageSize,
+	})
+}
+
+var systemFieldNames = map[string]bool{
+	"_id": true, "module": true, "description": true,
+	"created_at": true, "updated_at": true,
+	"created_by": true, "updated_by": true,
+	"data_path": true, "file_path": true, "custom_fields": true,
+}
+
+func prefixCustomFields(m bson.M) bson.M {
+	result := bson.M{}
+	for k, v := range m {
+		switch k {
+		case "$and", "$or":
+			arr, ok := v.([]bson.M)
+			if ok {
+				prefixed := make([]bson.M, len(arr))
+				for i, item := range arr {
+					prefixed[i] = prefixCustomFields(item)
+				}
+				result[k] = prefixed
+			} else if arr2, ok := v.([]interface{}); ok {
+				prefixed := make([]bson.M, len(arr2))
+				for i, item := range arr2 {
+					if bsm, ok := item.(bson.M); ok {
+						prefixed[i] = prefixCustomFields(bsm)
+					}
+				}
+				result[k] = prefixed
+			}
+		case "$not":
+			if vm, ok := v.(bson.M); ok {
+				result[k] = prefixCustomFields(vm)
+			}
+		default:
+			if vv, ok := v.(bson.M); ok {
+				hasOpKey := false
+				for subKey := range vv {
+					if len(subKey) > 0 && subKey[0] == '$' {
+						hasOpKey = true
+						break
+					}
+				}
+				if hasOpKey {
+					if !systemFieldNames[k] && len(k) > 0 && k[0] != '$' {
+						result["custom_fields."+k] = vv
+					} else {
+						result[k] = vv
+					}
+				} else {
+					result[k] = prefixCustomFields(vv)
+				}
+			} else if !systemFieldNames[k] && len(k) > 0 && k[0] != '$' {
+				result["custom_fields."+k] = v
+			} else {
+				result[k] = v
+			}
+		}
+	}
+	return result
 }

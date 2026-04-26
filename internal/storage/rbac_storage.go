@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type RBACStorage interface {
@@ -80,15 +81,82 @@ func NewRBACMongoDBStorage(uri, databaseName string) (RBACStorage, error) {
 func (s *rbacMongoDBStorage) InitDefaultData() error {
 	ctx := context.Background()
 
-	if _, err := s.users.CountDocuments(ctx, bson.M{}); err != nil {
+	count, err := s.permissions.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	now := time.Now()
+
+	sysPerm := &models.Permission{
+		Name:        "System Admin",
+		Code:        "system:admin",
+		Description: "System administrator permission",
+	}
+	sysPerm.CreatedBy = "system"
+	sysPerm.CreatedAt = now
+	sysPerm.UpdatedAt = now
+	if err := s.CreatePermission(sysPerm); err != nil {
 		return err
 	}
 
-	if _, err := s.permissions.CountDocuments(ctx, bson.M{}); err != nil {
+	permCodes := []string{
+		"user:read", "user:write", "user:manage",
+		"role:read", "role:write", "role:manage",
+		"permission:read", "permission:write", "permission:manage",
+		"collection:read", "collection:write", "collection:manage",
+		"field:read", "field:write", "field:manage",
+		"data:read", "data:write", "data:manage",
+		"scrape:read", "scrape:write", "scrape:manage",
+	}
+
+	allPermIDs := []string{sysPerm.ID.Hex()}
+	for _, code := range permCodes {
+		perm := &models.Permission{
+			Name:        code,
+			Code:        code,
+			Description: code + " permission",
+		}
+		perm.CreatedBy = "system"
+		perm.CreatedAt = now
+		perm.UpdatedAt = now
+		if err := s.CreatePermission(perm); err != nil {
+			return err
+		}
+		allPermIDs = append(allPermIDs, perm.ID.Hex())
+	}
+
+	rootRole := &models.Role{
+		Name:          "超级管理员",
+		Code:          "root",
+		Description:   "超级管理员角色",
+		PermissionIDs: allPermIDs,
+	}
+	rootRole.CreatedBy = "system"
+	rootRole.CreatedAt = now
+	rootRole.UpdatedAt = now
+	if err := s.CreateRole(rootRole); err != nil {
 		return err
 	}
 
-	if _, err := s.roles.CountDocuments(ctx, bson.M{}); err != nil {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("liangminchuan"), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	adminUser := &models.User{
+		Username: "admin",
+		Password: string(hashedPassword),
+		Email:    "admin@datacenter.local",
+		RoleIDs:  []string{rootRole.ID.Hex()},
+	}
+	adminUser.CreatedBy = "system"
+	adminUser.CreatedAt = now
+	adminUser.UpdatedAt = now
+	if err := s.CreateUser(adminUser); err != nil {
 		return err
 	}
 
