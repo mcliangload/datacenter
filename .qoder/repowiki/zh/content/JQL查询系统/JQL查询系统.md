@@ -13,7 +13,18 @@
 - [models.go](file://internal/models/models.go)
 - [rbac.go](file://pkg/rbac/rbac.go)
 - [rbac_storage.go](file://internal/storage/rbac_storage.go)
+- [requirements.md](file://docs/modules/jql/requirements.md)
+- [tech.md](file://docs/modules/jql/tech.md)
+- [implementation.md](file://docs/modules/jql/implementation.md)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增JQL模块的完整技术规格文档
+- 更新解析器实现细节和架构设计
+- 增强查询优化和性能考虑
+- 完善API接口和错误处理机制
+- 扩展查询示例和使用场景
 
 ## 目录
 1. [简介](#简介)
@@ -31,12 +42,21 @@
 
 JQL（JSON Query Language）是一个专为MongoDB设计的安全查询语言系统。它提供了类似JIRA JQL的语法，支持丰富的操作符和逻辑运算符，能够将人类可读的查询语句转换为安全的MongoDB查询条件。
 
+**更新** 新增了完整的JQL模块技术文档，包括需求设计、技术实现和详细架构说明。
+
 本系统的核心特性包括：
 - 安全的查询解析和转换机制
 - 支持多种数据类型的值处理
 - 内置函数支持（当前用户、时间函数等）
 - 嵌套字段查询支持
 - 完整的错误处理和验证机制
+- 递归下降解析器实现
+- 前端查询示例和验证
+
+**章节来源**
+- [requirements.md:1-198](file://docs/modules/jql/requirements.md#L1-L198)
+- [tech.md:1-273](file://docs/modules/jql/tech.md#L1-L273)
+- [implementation.md:1-474](file://docs/modules/jql/implementation.md#L1-L474)
 
 ## 项目结构
 
@@ -47,6 +67,8 @@ graph TB
 subgraph "前端层"
 FE[前端应用]
 JQLTS[jql.ts]
+EXAMPLES[查询示例]
+VALIDATOR[语法验证]
 end
 subgraph "后端层"
 API[API处理器]
@@ -56,6 +78,7 @@ end
 subgraph "查询层"
 JQL[JQL解析器]
 PARSER[解析器引擎]
+PREFIX[字段前缀转换]
 end
 subgraph "存储层"
 STORAGE[存储接口]
@@ -71,6 +94,7 @@ JQLTS --> API
 API --> HANDLERS
 HANDLERS --> JQL
 JQL --> PARSER
+PARSER --> PREFIX
 HANDLERS --> STORAGE
 STORAGE --> MONGO
 HANDLERS --> RBAC
@@ -81,16 +105,20 @@ RBAC --> AUTH
 - [main.go:24-150](file://cmd/server/main.go#L24-L150)
 - [handlers.go:45-181](file://internal/api/handlers.go#L45-L181)
 - [parser.go:42-653](file://pkg/jql/parser.go#L42-L653)
+- [tech.md:9-23](file://docs/modules/jql/tech.md#L9-L23)
 
 **章节来源**
 - [main.go:24-150](file://cmd/server/main.go#L24-L150)
 - [handlers.go:45-181](file://internal/api/handlers.go#L45-L181)
+- [tech.md:9-23](file://docs/modules/jql/tech.md#L9-L23)
 
 ## 核心组件
 
 ### JQL解析器
 
 JQL解析器是整个系统的核心组件，负责将自然语言风格的查询语句转换为MongoDB可执行的查询条件。
+
+**更新** 基于新增的技术文档，解析器实现了完整的递归下降解析器，包含词法分析、语法分析和MongoDB转换三个阶段。
 
 #### 主要功能特性：
 - **词法分析**：识别查询语句中的字段名、操作符、值和函数
@@ -105,10 +133,16 @@ JQL解析器是整个系统的核心组件，负责将自然语言风格的查�
 - 空值检查：`IS NULL`, `IS NOT NULL`
 - 逻辑操作：`AND`, `OR`, `NOT`
 
+#### 内置函数支持：
+- 时间函数：`Now()`, `StartOfDay()`, `EndOfDay()`, `StartOfWeek()`, `EndOfWeek()`, `StartOfMonth()`, `EndOfMonth()`
+- 用户函数：`CurrentUser()`
+
 **章节来源**
 - [parser.go:14-30](file://pkg/jql/parser.go#L14-L30)
 - [parser.go:132-144](file://pkg/jql/parser.go#L132-L144)
 - [parser.go:538-574](file://pkg/jql/parser.go#L538-L574)
+- [requirements.md:9-77](file://docs/modules/jql/requirements.md#L9-L77)
+- [tech.md:173-211](file://docs/modules/jql/tech.md#L173-L211)
 
 ### MongoDB存储层
 
@@ -136,6 +170,20 @@ JQL解析器是整个系统的核心组件，负责将自然语言风格的查�
 - [rbac.go:63-99](file://pkg/rbac/rbac.go#L63-L99)
 - [rbac_storage.go:16-50](file://internal/storage/rbac_storage.go#L16-L50)
 
+### 前端查询服务
+
+前端提供了完整的JQL查询服务，包括查询示例、语法验证和用户界面支持。
+
+#### 主要功能：
+- **查询示例**：提供13种常用查询示例
+- **语法验证**：基本的语法检查和验证
+- **操作符支持**：支持比较、逻辑和特殊操作符
+- **函数支持**：支持时间函数和用户函数
+
+**章节来源**
+- [jql.ts:1-51](file://frontend/src/services/jql.ts#L1-L51)
+- [implementation.md:253-272](file://docs/modules/jql/implementation.md#L253-L272)
+
 ## 架构概览
 
 JQL查询系统的整体架构采用分层设计，确保了良好的可维护性和扩展性。
@@ -145,6 +193,7 @@ sequenceDiagram
 participant Client as 客户端
 participant API as API处理器
 participant Parser as JQL解析器
+participant Prefix as 字段前缀转换
 participant Storage as 存储层
 participant MongoDB as MongoDB
 Client->>API : 发送查询请求
@@ -154,7 +203,9 @@ Parser->>Parser : 词法分析
 Parser->>Parser : 语法解析
 Parser->>Parser : AST构建
 Parser->>Parser : 转换为MongoDB查询
-Parser-->>API : 返回查询条件
+Parser->>Prefix : 应用字段前缀
+Prefix->>Prefix : 处理嵌套字段
+Prefix-->>API : 返回最终查询条件
 API->>Storage : 执行查询
 Storage->>MongoDB : 执行MongoDB查询
 MongoDB-->>Storage : 返回查询结果
@@ -163,15 +214,17 @@ API-->>Client : 返回查询结果
 ```
 
 **图表来源**
-- [handlers.go:105-132](file://internal/api/handlers.go#L105-L132)
+- [handlers.go:1019-1029](file://internal/api/handlers.go#L1019-L1029)
 - [parser.go:46-65](file://pkg/jql/parser.go#L46-L65)
-- [mongodb_storage.go:366-395](file://internal/storage/mongodb_storage.go#L366-L395)
+- [implementation.md:418-449](file://docs/modules/jql/implementation.md#L418-L449)
 
 ## 详细组件分析
 
 ### JQL解析器实现
 
 JQL解析器采用了经典的编译器设计模式，包含三个主要阶段：
+
+**更新** 基于新增的实现文档，解析器是一个完整的递归下降解析器，实现了BNF语法规范。
 
 #### 1. 词法分析阶段
 词法分析器将输入的查询字符串分解为一系列标记（Token），包括：
@@ -181,12 +234,16 @@ JQL解析器采用了经典的编译器设计模式，包含三个主要阶段�
 - 函数调用（Function）
 - 逻辑操作符（AND, OR, NOT）
 
+**更新** 词法分析实现了完整的优先级扫描机制，支持关键字识别、操作符识别、值识别等功能。
+
 #### 2. 语法分析阶段
 语法分析器根据JQL语法规则构建抽象语法树（AST），支持：
 - 操作符优先级处理
 - 括号优先级
 - 嵌套表达式
 - 逻辑运算符组合
+
+**更新** 语法分析实现了完整的BNF语法规范，包括表达式、条件、值列表等语法规则。
 
 #### 3. 语义转换阶段
 将AST转换为MongoDB查询条件，包括：
@@ -195,12 +252,15 @@ JQL解析器采用了经典的编译器设计模式，包含三个主要阶段�
 - 值类型处理
 - 嵌套查询支持
 
+**更新** 转换阶段实现了MongoDB操作符映射和逻辑运算符转换。
+
 ```mermaid
 flowchart TD
 Start([开始解析]) --> Tokenize[词法分析]
 Tokenize --> BuildAST[构建AST]
 BuildAST --> ConvertMongoDB[转换为MongoDB]
-ConvertMongoDB --> Validate[验证查询]
+ConvertMongoDB --> PrefixFields[应用字段前缀]
+PrefixFields --> Validate[验证查询]
 Validate --> Result[返回查询条件]
 Tokenize --> Error1[词法错误]
 BuildAST --> Error2[语法错误]
@@ -215,15 +275,19 @@ ErrorHandler --> Result
 - [parser.go:67-230](file://pkg/jql/parser.go#L67-L230)
 - [parser.go:268-421](file://pkg/jql/parser.go#L268-L421)
 - [parser.go:576-623](file://pkg/jql/parser.go#L576-L623)
+- [implementation.md:45-174](file://docs/modules/jql/implementation.md#L45-L174)
 
 **章节来源**
 - [parser.go:67-230](file://pkg/jql/parser.go#L67-L230)
 - [parser.go:268-421](file://pkg/jql/parser.go#L268-L421)
 - [parser.go:576-623](file://pkg/jql/parser.go#L576-L623)
+- [implementation.md:45-174](file://docs/modules/jql/implementation.md#L45-L174)
 
 ### 查询条件转换机制
 
 JQL到MongoDB的转换遵循严格的映射规则，确保查询的安全性和准确性。
+
+**更新** 基于新增的技术文档，转换机制实现了完整的MongoDB操作符映射。
 
 #### 操作符映射表：
 
@@ -250,6 +314,7 @@ JQL解析器支持深度嵌套的文档字段查询，如：
 **章节来源**
 - [parser.go:538-574](file://pkg/jql/parser.go#L538-L574)
 - [parser_test.go:565-717](file://pkg/jql/parser_test.go#L565-L717)
+- [tech.md:122-171](file://docs/modules/jql/tech.md#L122-L171)
 
 ### API接口设计
 
@@ -281,6 +346,21 @@ POST /api/query/validate
 **章节来源**
 - [query.md:182-226](file://docs/query.md#L182-L226)
 - [handlers.go:124-132](file://internal/api/handlers.go#L124-L132)
+
+### 字段前缀转换机制
+
+**更新** 新增了字段前缀转换机制，用于处理业务数据的嵌套字段结构。
+
+由于业务数据的自定义字段存储在 `custom_fields` 嵌套文档中，JQL解析后的字段名需要添加前缀。
+
+#### 转换规则：
+- 系统字段名（`_id`, `module`, `description`, `created_at`, `updated_at`, `created_by`, `updated_by`, `data_path`, `file_path`, `custom_fields`）→ 不添加前缀
+- MongoDB操作符（以 `$` 开头）→ 不添加前缀
+- 其他字段 → 添加 `custom_fields.` 前缀
+
+**章节来源**
+- [implementation.md:415-449](file://docs/modules/jql/implementation.md#L415-L449)
+- [tech.md:214-249](file://docs/modules/jql/tech.md#L214-L249)
 
 ## 依赖分析
 
@@ -338,6 +418,8 @@ JQLPKG --> TIME
 
 JQL查询系统在设计时充分考虑了性能优化，提供了多种优化策略：
 
+**更新** 基于新增的需求文档，系统具备高性能解析能力。
+
 ### 索引策略
 - **单字段索引**：为常用查询字段创建索引
 - **复合索引**：为多条件查询创建复合索引
@@ -354,6 +436,15 @@ JQL查询系统在设计时充分考虑了性能优化，提供了多种优化�
 - **慢查询日志**：记录执行时间超过阈值的查询
 - **查询统计**：统计查询频率和性能指标
 - **内存使用监控**：监控查询过程中的内存使用情况
+
+### 解析性能
+- **单次解析在毫秒级完成**：满足高性能需求
+- **递归下降解析器**：高效的语法解析
+- **内存池优化**：减少内存分配开销
+
+**章节来源**
+- [requirements.md:176-184](file://docs/modules/jql/requirements.md#L176-L184)
+- [tech.md:173-211](file://docs/modules/jql/tech.md#L173-L211)
 
 ## 故障排除指南
 
@@ -396,13 +487,28 @@ JQL查询系统在设计时充分考虑了性能优化，提供了多种优化�
 - 检查日期格式是否符合RFC3339标准
 - 确认数字格式的正确性
 
+#### 4. 嵌套字段解析错误
+**症状**：嵌套字段查询失败
+**可能原因**：
+- 字段路径格式错误
+- 嵌套层级过多
+- 特殊字符处理问题
+
+**解决方法**：
+- 验证字段路径格式
+- 检查嵌套层级限制
+- 使用正确的字段分隔符
+
 **章节来源**
 - [parser_test.go:204-265](file://pkg/jql/parser_test.go#L204-L265)
 - [rbac.go:63-99](file://pkg/rbac/rbac.go#L63-L99)
+- [implementation.md:565-787](file://docs/modules/jql/implementation.md#L565-L787)
 
 ## 结论
 
 JQL查询系统是一个设计精良、功能完整的查询语言解决方案。它成功地将复杂的查询需求转化为简洁易用的语法，同时保持了高度的安全性和性能。
+
+**更新** 基于新增的技术文档，系统展现了更完善的设计和实现。
 
 ### 主要优势
 1. **安全性**：通过严格的解析和验证机制防止注入攻击
@@ -410,6 +516,7 @@ JQL查询系统是一个设计精良、功能完整的查询语言解决方案�
 3. **扩展性**：模块化设计便于功能扩展
 4. **性能**：优化的查询转换和索引策略
 5. **可靠性**：完善的错误处理和监控机制
+6. **完整性**：完整的前端、后端和存储层支持
 
 ### 技术特色
 - 支持嵌套字段查询
@@ -417,33 +524,55 @@ JQL查询系统是一个设计精良、功能完整的查询语言解决方案�
 - 完整的权限控制机制
 - 灵活的查询结果处理
 - 可扩展的存储架构
+- 递归下降解析器实现
+- 字段前缀转换机制
 
 ## 附录
 
 ### 查询示例
 
+**更新** 基于新增的实现文档，提供了13种完整的查询示例。
+
 #### 基础查询
 ```
 status = "active"
 price > 100
-created > "2024-01-01"
+name ~ "产品"
 ```
 
-#### 复合查询
+#### 条件组合
 ```
 status = "active" AND price > 100
 name = "A" OR name = "B"
-(status = "active") AND (price > 100 OR price < 50)
+NOT status = "deleted"
 ```
 
-#### 高级查询
+#### 括号分组
+```
+(status = "active" OR status = "pending") AND price > 100
+```
+
+#### 列表与空值
+```
+status IN ("active", "pending", "review")
+category NOT IN ("deleted", "archived")
+assignee IS NULL
+email IS NOT NULL
+```
+
+#### 时间函数
 ```
 created > StartOfWeek() AND module = "movie"
 updated < EndOfMonth() AND status NOT IN ("deleted", "archived")
-profile.name ~ "john" AND profile.age >= 18
 ```
 
+**章节来源**
+- [implementation.md:253-272](file://docs/modules/jql/implementation.md#L253-L272)
+- [requirements.md:134-173](file://docs/modules/jql/requirements.md#L134-L173)
+
 ### 支持的操作符一览
+
+**更新** 基于新增的需求文档，提供了完整的操作符支持列表。
 
 | 操作符类别 | 支持的操作符 | 说明 |
 |------------|--------------|------|
@@ -454,6 +583,17 @@ profile.name ~ "john" AND profile.age >= 18
 | 逻辑操作符 | `AND`, `OR`, `NOT` | 组合多个条件 |
 | 特殊操作符 | `LIKE`, `contains` | 文本匹配功能 |
 
+### 内置函数支持
+
+**更新** 基于新增的技术文档，提供了完整的函数支持列表。
+
+| 函数类别 | 支持的函数 | 说明 |
+|----------|------------|------|
+| 时间函数 | `Now()`, `StartOfDay()`, `EndOfDay()` | 当前时间和日期范围 |
+| 时间函数 | `StartOfWeek()`, `EndOfWeek()` | 本周开始和结束时间 |
+| 时间函数 | `StartOfMonth()`, `EndOfMonth()` | 本月开始和结束时间 |
+| 用户函数 | `CurrentUser()` | 当前登录用户信息 |
+
 ### 安全最佳实践
 
 1. **输入验证**：始终验证用户输入的查询语句
@@ -461,8 +601,10 @@ profile.name ~ "john" AND profile.age >= 18
 3. **查询限制**：限制查询的复杂度和结果集大小
 4. **监控告警**：监控异常查询行为
 5. **定期审计**：定期审查查询日志和权限使用情况
+6. **嵌套字段安全**：验证嵌套字段路径的有效性
 
 **章节来源**
-- [query.md:64-78](file://docs/query.md#L64-L78)
-- [query.md:119-139](file://docs/query.md#L119-L139)
-- [parser.go:630-647](file://pkg/jql/parser.go#L630-L647)
+- [requirements.md:67-77](file://docs/modules/jql/requirements.md#L67-L77)
+- [requirements.md:176-184](file://docs/modules/jql/requirements.md#L176-L184)
+- [tech.md:173-211](file://docs/modules/jql/tech.md#L173-L211)
+- [implementation.md:453-474](file://docs/modules/jql/implementation.md#L453-L474)
