@@ -1,0 +1,33 @@
+# 构建产物
+/bin/
+*.exe
+*.test
+
+# 本地 Go 工具链缓存（scripts/goenv.ps1 重定向）
+.goenv
+.gomodcache/
+.gocache/
+.gopath/
+.gotmp/
+
+# 本地测试环境（mongod 二进制与数据、NFS 测试数据根）
+.tools/
+.nfsdata/
+
+# 环境与密钥
+.env
+*.pem
+*.key
+
+# 日志
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db

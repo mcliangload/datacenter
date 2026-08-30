@@ -1,0 +1,32 @@
+# 服务端配置示例（可用环境变量覆盖，前缀 DATACENTER_，如 DATACENTER_SERVER_PORT=9090）
+server:
+  port: 8080
+  mode: debug # debug / release
+
+database:
+  uri: mongodb://localhost:27017
+  name: datacenter
+  timeout: 10 # 连接超时（秒）
+
+jwt:
+  secret: datacenter-dev-secret # 生产环境务必通过环境变量覆盖（release 模式校验默认值并拒绝启动）
+  expire_hours: 12 # 安全增强 P1-8：令牌有效期收紧（原 72h），内网可放宽
+  issuer: datacenter
+
+log:
+  level: info # debug / info / warn / error
+  output: stdout # stdout 或日志文件路径
+
+data:
+  root_dir: /nfs/data # NFS 数据根目录（防路径逃逸的基准）
+
+scrape:
+  worker_count: 8 # 刮削 Worker 并发数
+  timeout_seconds: 1800 # 单任务执行超时（秒），python 脚本可能长时间运行
+  poll_interval_ms: 2000 # 空闲轮询间隔（毫秒）
+  output_limit_bytes: 1048576 # 脚本输出大小上限（字节）
+  reclaim_seconds: 3600 # 僵死任务回收阈值（秒）
+
+bootstrap:
+  admin_username: admin
+  admin_password: admin123 # 首次启动自动创建；生产环境务必修改
