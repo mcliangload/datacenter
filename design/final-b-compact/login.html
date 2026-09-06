@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">DC</div>
+    <h1>数据中心</h1>
+    <div class="sub">数据资产 · 血缘 · 元数据治理</div>
+    <form onsubmit="return false">
+      <label class="field"><span>用户名</span><input class="input" value="admin" placeholder="请输入用户名"></label>
+      <label class="field"><span>密码</span><input class="input" value="admin123" type="password" placeholder="请输入密码"></label>
+      <button class="btn pri block">登 录</button>
+    </form>
+    <div class="login-hint">默认管理员：admin / admin123<br>生产环境请通过环境变量覆盖</div>
+  </div>
+</div>
+
+<div id="toasts">
+  <div class="toast ok"><b>✓</b>登录成功</div>
+</div>
+</body>
+</html>

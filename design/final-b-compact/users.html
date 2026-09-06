@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>权限管理 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link active"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">系统 / <b>权限管理</b></div>
+      <div class="search">⌕<input placeholder="搜索用户"></div>
+    </div>
+    <div class="page-head">
+      <div><h1>权限管理</h1><div class="desc">用户 · 全局角色（admin 专属）</div></div>
+      <div class="head-actions"><button class="btn pri">＋ 创建用户</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>用户列表</h3><div class="actions"><div class="seg"><button class="active">全部</button><button>管理员</button><button>已禁用</button></div></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td><b style="font-weight:600">admin</b></td><td><span class="badge b-info">全局管理员</span></td><td><span class="badge b-ok">启用</span></td><td class="mono">2025-03-01</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">禁用</button></td></tr>
+            <tr><td><b style="font-weight:600">zzhang</b></td><td><span class="badge b-muted">操作工</span></td><td><span class="badge b-ok">启用</span></td><td class="mono">2025-04-15</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">禁用</button></td></tr>
+            <tr><td><b style="font-weight:600">lwang</b></td><td><span class="badge b-muted">操作工</span></td><td><span class="badge b-err">禁用</span></td><td class="mono">2025-05-20</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">删除</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 创建用户弹窗样例 -->
+    <div class="mask" style="position:static;margin-top:16px;background:none;backdrop-filter:none;align-items:flex-start">
+      <div class="modal" style="width:100%">
+        <div class="modal-title">＋ 创建用户</div>
+        <div class="form-row">
+          <label class="field"><span>用户名</span><input class="input" placeholder="username"></label>
+          <label class="field"><span>初始密码</span><input class="input" type="password" placeholder="至少 8 位"></label>
+        </div>
+        <label class="field"><span>角色</span><select class="input"><option>操作工（operator）</option><option>全局管理员（admin）</option></select></label>
+        <div class="modal-foot"><button class="btn">取消</button><button class="btn pri">创建</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>刮削管理 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link active"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><div class="crumb">数据 / <b>刮削管理</b></div></div>
+    <div class="page-head">
+      <div><h1>刮削任务</h1><div class="desc">全局刮削任务 · Worker 池（默认 8）</div></div>
+      <div class="head-actions"><div class="seg"><button class="active">全部</button><button>运行中</button><button>失败</button></div></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--panel-2);color:var(--text-3)">…</span>待处理</div><div class="num">1,204</div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--warn-soft);color:var(--warn)">⌲</span>运行中</div><div class="num">28</div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--ok-soft);color:var(--ok)">✓</span>成功</div><div class="num">8,900</div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--err-soft);color:var(--err)">!</span>失败</div><div class="num">12</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>任务列表</h3><div class="actions"><label class="field" style="margin:0;width:140px"><select class="input"><option>全部集合</option><option>model</option><option>layout</option></select></label><button class="btn sm">刷新</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>任务</th><th>集合</th><th>数据项</th><th>状态</th><th>脚本</th><th>耗时</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">#9f21</td><td><span class="tag-type t-layout">layout</span></td><td class="mono">/opc/layout/cell_a01.gds</td><td><span class="badge b-run"><span class="dot"></span>运行中</span></td><td class="mono">opc_extract.py</td><td class="mono">18s</td><td class="actions-cell"><button class="btn sm">详情</button></td></tr>
+            <tr><td class="mono">#9f20</td><td><span class="tag-type t-model">model</span></td><td class="mono">/opc/model/na_28nm_v3.opc</td><td><span class="badge b-ok">成功</span></td><td class="mono">opc_extract.py</td><td class="mono">42s</td><td class="actions-cell"><button class="btn sm">详情</button></td></tr>
+            <tr><td class="mono">#9f19</td><td><span class="tag-type t-case">case</span></td><td class="mono">/opc/case/case_0184.case</td><td><span class="badge b-err">失败</span></td><td class="mono">opc_extract.py</td><td class="mono">exit 1</td><td class="actions-cell"><button class="btn sm">详情</button><button class="btn sm">重试</button></td></tr>
+            <tr><td class="mono">#9f18</td><td><span class="tag-type t-layer">layer</span></td><td class="mono">/opc/layer/poly_v2.layer</td><td><span class="badge b-ok">成功</span></td><td class="mono">opc_extract.py</td><td class="mono">30s</td><td class="actions-cell"><button class="btn sm">详情</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager"><span>共 8,940</span><button class="pg">‹</button><button class="pg active">1</button><button class="pg">2</button><button class="pg">3</button><button class="pg">›</button></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

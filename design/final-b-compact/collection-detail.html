@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>集合详情 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link active"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><div class="crumb">集合管理 / <b>OPC 模型库</b></div></div>
+    <div class="page-head">
+      <div style="display:flex;align-items:center;gap:10px"><h1>OPC 模型库</h1><span class="tag-type t-model">model</span></div>
+      <div class="head-actions"><button class="btn ghost">更换管理员</button><button class="btn">进入数据</button><button class="btn pri">＋ 添加数据项</button></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active">概览</div><div class="tab">标签定义</div><div class="tab">刮削脚本</div><div class="tab">成员</div><div class="tab">删除策略</div>
+    </div>
+
+    <!-- 概览 -->
+    <div class="card"><div class="card-head"><h3>概览</h3></div>
+      <div class="card-body">
+        <div class="detail">
+          <div class="k">名称</div><div class="v">OPC 模型库</div>
+          <div class="k">描述</div><div class="v">光学 / 光刻胶 / 刻蚀 OPC 模型数据</div>
+          <div class="k">数据项</div><div class="v">8,120 项</div>
+          <div class="k">创建</div><div class="v">2025-03-12 · admin</div>
+          <div class="k">删除策略</div><div class="v"><span class="badge b-muted">children: deny</span> <span class="badge b-muted">incoming: deny</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签定义 -->
+    <div class="card"><div class="card-head"><h3>标签定义</h3><span class="sub">26 个</span><div class="actions"><button class="btn sm">＋ 添加</button><button class="btn sm">增量合并</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>标签名</th><th>类型</th><th>必填</th><th>校验</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">node</td><td><span class="badge b-info">枚举</span></td><td>是</td><td>7 / 10 / 14</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">删</button></td></tr>
+            <tr><td class="mono">accuracy_rms</td><td><span class="badge b-violet">浮点</span></td><td>是</td><td>0 ~ 1</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">删</button></td></tr>
+            <tr><td class="mono">calibration</td><td><span class="badge">对象</span></td><td>否</td><td>嵌套字段</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">删</button></td></tr>
+            <tr><td class="mono">keywords</td><td><span class="badge b-muted">数组</span></td><td>否</td><td>—</td><td class="actions-cell"><button class="btn sm">编辑</button><button class="btn sm danger">删</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 刮削脚本 -->
+    <div class="card"><div class="card-head"><h3>刮削脚本</h3><div class="actions"><button class="btn sm">更新路径</button></div></div>
+      <div class="card-body">
+        <div class="detail">
+          <div class="k">脚本路径</div><div class="v mono">/nfs/scripts/opc_extract.py</div>
+          <div class="k">协议</div><div class="v"><code class="mono">&lt;script&gt; &lt;data_path&gt;</code> · stdout 输出 JSON 标签</div>
+          <div class="k">更新</div><div class="v">2025-04-02 · admin</div>
+        </div>
+        <div class="help" style="margin-top:8px">成功判据：合法 JSON 且通过标签定义校验；退出码仅记录诊断；超时 1800s，输出上限 1MB。</div>
+      </div>
+    </div>
+
+    <!-- 成员 -->
+    <div class="card"><div class="card-head"><h3>成员</h3><div class="actions"><button class="btn sm">＋ 授权操作工</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>用户</th><th>角色</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td><b style="font-weight:600">admin</b> <span class="cell-sub" style="margin-left:6px">系统管理员</span></td><td><span class="badge b-info">集合管理员</span></td><td class="actions-cell"><button class="btn sm danger">移除</button></td></tr>
+            <tr><td><b style="font-weight:600">zzhang</b></td><td><span class="badge b-muted">操作工</span></td><td class="actions-cell"><button class="btn sm danger">移除</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

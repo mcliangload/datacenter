@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DQL 语法 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+<style>
+  .grammar{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text-2)}
+  .grammar .kw{color:var(--accent);font-weight:600}
+  .grammar .op{color:var(--violet)}
+  .grammar .cm{color:var(--text-3)}
+  .kv{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link active"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><div class="crumb">系统 / <b>DQL 语法</b></div></div>
+    <div class="page-head">
+      <div><h1>DQL 语法</h1><div class="desc">DataQueryLanguage · 跨集合查询数据项</div></div>
+      <div class="head-actions"><button class="btn">复制示例</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>语法结构</h3></div>
+      <div class="card-body">
+        <div class="grammar">
+          <span class="kv">expr</span>   := <span class="kw">orExpr</span><br>
+          <span class="kv">orExpr</span> := <span class="kw">andExpr</span> (<span class="kw">OR</span> <span class="kw">andExpr</span>)*  <span class="cm">-- AND 优先级高于 OR</span><br>
+          <span class="kv">andExpr</span>:= <span class="kw">primary</span> (<span class="kw">AND</span> <span class="kw">primary</span>)*<br>
+          <span class="kv">primary</span>:= '(' <span class="kw">expr</span> ')' | <span class="kw">条件</span><br>
+          <span class="kv">条件</span>  := 字段 运算符 值<br>
+          <span class="kv">运算符</span>:= <span class="op">=</span> | <span class="op">!=</span> | <span class="op">&gt;</span> | <span class="op">&gt;=</span> | <span class="op">&lt;</span> | <span class="op">&lt;=</span> | <span class="op">IN</span> | <span class="op">EXISTS</span> | <span class="op">LIKE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>运算符与字段</h3><div class="actions"><button class="btn sm">复制</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>运算符</th><th>说明</th><th>适用类型</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">= &nbsp; !=</td><td>等值 / 不等</td><td>全部</td></tr>
+            <tr><td class="mono">&gt; &nbsp; &gt;= &nbsp; &lt; &nbsp; &lt;=</td><td>范围</td><td>int / float / date</td></tr>
+            <tr><td class="mono">IN</td><td>值列表</td><td>全部</td></tr>
+            <tr><td class="mono">EXISTS</td><td>标签存在性</td><td>全部</td></tr>
+            <tr><td class="mono">LIKE</td><td>包含匹配（大小写不敏感）</td><td>string / enum</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body" style="padding-top:12px">
+        <div class="help">特殊字段：<code class="mono">collection</code>（限定集合）、<code class="mono">parent</code>（直接子）、<code class="mono">ancestor</code>（子树）。值可用单/双引号或数字；<code class="mono">ORDER BY field ASC|DESC</code> 排序仅限数值/日期标签。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>示例</h3></div>
+      <div class="card-body">
+        <div class="examples" style="margin:0">
+          <button class="ex-chip">model_name = "demo-model"</button>
+          <button class="ex-chip">age &gt;= 3 AND stage IN ("dev","test")</button>
+          <button class="ex-chip">(name LIKE "opc" OR version = "1.0") AND age EXISTS true</button>
+          <button class="ex-chip">collection = "光刻模型库" AND age &gt;= 1</button>
+          <button class="ex-chip">collection = "model" AND status = "released" ORDER BY accuracy_rms DESC</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

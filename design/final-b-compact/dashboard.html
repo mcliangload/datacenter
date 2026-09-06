@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仪表盘 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link active"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">工作区 / <b>仪表盘</b></div>
+      <div class="search">⌕<input placeholder="搜索数据项 / 路径 / 标签"></div>
+      <div class="top-actions"><button class="btn ghost">豁免</button><button class="btn">刷新</button></div>
+    </div>
+
+    <div class="page-head">
+      <div><h1>仪表盘</h1><div class="desc">数据资产概览与刮削运行状态</div></div>
+      <div class="head-actions"><button class="btn">⌕ 高级搜索</button><button class="btn pri">＋ 添加数据</button></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--accent-soft);color:var(--accent)">▦</span>集合</div><div class="num">12</div><div class="delta"><span class="up">▲ 3</span> 本周</div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--violet-soft);color:var(--violet)">◇</span>数据项</div><div class="num">26,300</div><div class="delta"><span class="up">▲ 1,204</span> 本周</div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--warn-soft);color:var(--warn)">⌲</span>刮削任务</div><div class="num">8,940</div><div class="delta">成功率 <span class="up">99.9%</span></div></div>
+      <div class="stat"><div class="lab"><span class="ico" style="background:var(--ok-soft);color:var(--ok)">⛓</span>关联关系</div><div class="num">24,120</div><div class="delta"><span class="flat">血缘完整</span></div></div>
+    </div>
+
+    <div class="dql"><span class="k">DQL</span><code class="input">collection = "model" AND status = "released" ORDER BY accuracy_rms ASC</code><button class="btn pri run">运行</button></div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-head"><h3>数据项 · 最近更新</h3><span class="sub">进入数据查询查看全部</span>
+          <div class="actions"><button class="btn sm">查看全部</button></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>路径</th><th>集合</th><th>标签</th><th>状态</th><th>更新</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">/opc/model/na_28nm_v3.opc</td><td><span class="tag-type t-model">model</span></td><td><span class="tag"><span class="k">node=</span>7</span><span class="tag"><span class="k">na=</span>1.35</span></td><td><span class="badge b-ok"><span class="dot"></span>已发布</span></td><td class="mono">2m</td></tr>
+              <tr><td class="mono">/opc/layout/cell_a01.gds</td><td><span class="tag-type t-layout">layout</span></td><td><span class="tag"><span class="k">cell=</span>A01</span><span class="tag"><span class="k">层=</span>14</span></td><td><span class="badge b-run"><span class="dot"></span>刮削中</span></td><td class="mono">18s</td></tr>
+              <tr><td class="mono">/opc/layer/poly_v2.layer</td><td><span class="tag-type t-layer">layer</span></td><td><span class="tag"><span class="k">type=</span>OD</span><span class="tag"><span class="k">min=</span>22nm</span></td><td><span class="badge b-info"><span class="dot"></span>已审核</span></td><td class="mono">1h</td></tr>
+              <tr><td class="mono">/opc/case/case_0184.case</td><td><span class="tag-type t-case">case</span></td><td><span class="tag"><span class="k">corner=</span>SS</span><span class="tag"><span class="k">epe=</span>3.2</span></td><td><span class="badge b-err"><span class="dot"></span>失败</span></td><td class="mono">3h</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>刮削任务概览</h3></div>
+        <div class="card-body">
+          <div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin-bottom:4px"><span>成功</span><b class="mono">8,900</b></div><div class="bar g"><i style="width:96%"></i></div></div>
+          <div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin-bottom:4px"><span>运行中</span><b class="mono">28</b></div><div class="bar w"><i style="width:12%"></i></div></div>
+          <div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin-bottom:4px"><span>失败</span><b class="mono">12</b></div><div class="bar r"><i style="width:5%"></i></div></div>
+          <div class="help" style="margin-top:6px">最近一次回收：3 分钟前 · 无僵死任务</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>最近集合</h3><div class="actions"><button class="btn sm">管理集合</button></div></div>
+      <div class="grid-cards" style="padding:12px">
+        <div class="col-card"><div class="row"><h3>OPC 模型库</h3><span class="tag-type t-model">model</span></div><div class="desc">光学 / 光刻胶 / 刻蚀 OPC 模型</div><div class="meta"><span>8,120 项</span><span>·</span><span>管理员</span></div></div>
+        <div class="col-card"><div class="row"><h3>版图设计库</h3><span class="tag-type t-layout">layout</span></div><div class="desc">GDS / OASIS / DEF 版图数据</div><div class="meta"><span>6,040 项</span><span>·</span><span>管理员</span></div></div>
+        <div class="col-card"><div class="row"><h3>图层库</h3><span class="tag-type t-layer">layer</span></div><div class="desc">版图图层子项</div><div class="meta"><span>9,300 项</span><span>·</span><span>管理员</span></div></div>
+        <div class="col-card"><div class="row"><h3>测试用例库</h3><span class="tag-type t-case">case</span></div><div class="desc">OPC 测试用例</div><div class="meta"><span>2,840 项</span><span>·</span><span>管理员</span></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toasts"><div class="toast ok"><b>✓</b>数据已同步</div></div>
+</body>
+</html>

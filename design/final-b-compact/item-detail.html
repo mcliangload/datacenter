@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据项详情 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link active"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb"><a href="#">数据查询</a> / <b>cell_a01.gds</b></div>
+      <div class="top-actions"><button class="btn sm">手动刮削</button><button class="btn sm danger">删除</button></div>
+    </div>
+    <div class="page-head">
+      <div><h1 class="mono" style="font-size:16px;font-weight:600">/opc/layout/cell_a01.gds</h1><div class="desc">位于 <span class="tag-type t-layout">layout</span> 集合</div></div>
+      <div class="head-actions"><button class="btn">编辑标签</button><button class="btn">查看血缘</button></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card"><div class="card-head"><h3>标签</h3><span class="sub">合并视图 · 手动优先</span></div>
+        <div class="card-body">
+          <div class="detail">
+            <div class="k">cell</div><div class="v"><span class="tag"><span class="v">A01</span></span><span class="badge b-ok" style="margin-left:6px">手动</span></div>
+            <div class="k">format</div><div class="v">GDS</div>
+            <div class="k">layer_count</div><div class="v">14</div>
+            <div class="k">area_um2</div><div class="v">412.6</div>
+            <div class="k">density</div><div class="v">0.58</div>
+            <div class="k">drc_status</div><div class="v"><span class="badge b-ok">PASS</span></div>
+            <div class="k">node</div><div class="v">7nm</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card"><div class="card-head"><h3>刮削历史</h3><div class="actions"><button class="btn sm">重刮</button></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>时间</th><th>状态</th><th>脚本</th><th>标签</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">2m 前</td><td><span class="badge b-run"><span class="dot"></span>运行中</span></td><td class="mono">opc_extract.py</td><td>—</td></tr>
+              <tr><td class="mono">1h 前</td><td><span class="badge b-ok">成功</span></td><td class="mono">opc_extract.py</td><td>14</td></tr>
+              <tr><td class="mono">2d 前</td><td><span class="badge b-err">失败</span></td><td class="mono">opc_extract.py</td><td>exit 1</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 血缘 -->
+    <div class="card"><div class="card-head"><h3>关联关系（血缘）</h3><span class="sub">出边 14 · 入边 2</span>
+        <div class="actions"><button class="btn sm">＋ 添加关联</button><button class="btn sm">树视图</button></div></div>
+      <div class="card-body">
+        <div class="rel-line"><span class="dir out">out</span><span class="tag-type t-layer">layer</span><span class="mono" style="flex:1">poly_v2.layer</span><span class="badge b-info">parent_child</span><button class="btn sm">打开</button></div>
+        <div class="rel-line"><span class="dir out">out</span><span class="tag-type t-layer">layer</span><span class="mono" style="flex:1">via_v2.layer</span><span class="badge b-info">parent_child</span><button class="btn sm">打开</button></div>
+        <div class="rel-line"><span class="dir out">out</span><span class="tag-type t-layer">layer</span><span class="mono" style="flex:1">metal_v1.layer</span><span class="badge b-info">parent_child</span><button class="btn sm">打开</button></div>
+        <div class="help">… 共 14 个子项（版图 → 图层，parent_child 单父树）</div>
+      </div>
+    </div>
+
+    <!-- 树视图 -->
+    <div class="card"><div class="card-head"><h3>树视图 · 版图 → 图层</h3></div>
+      <div class="card-body">
+        <div class="tree">
+          <div class="node root"><span class="lv">root</span>cell_a01.gds</div>
+          <div class="node"><span class="branch">├─</span>poly_v2.layer <span class="badge b-ok" style="margin-left:6px">OK</span></div>
+          <div class="node"><span class="branch">├─</span>via_v2.layer <span class="badge b-ok" style="margin-left:6px">OK</span></div>
+          <div class="node"><span class="branch">├─</span>metal_v1.layer <span class="badge b-run" style="margin-left:6px">刮削中</span></div>
+          <div class="node"><span class="branch">└─</span>contact_v1.layer <span class="badge b-err" style="margin-left:6px">失败</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

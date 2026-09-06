@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>集合管理 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link active"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">数据 / <b>集合管理</b></div>
+      <div class="search">⌕<input placeholder="搜索集合名称 / 描述"></div>
+    </div>
+    <div class="page-head">
+      <div><h1>集合管理</h1><div class="desc">以集合为单位管理数据资产 · 标签定义 / 刮削脚本 / 成员</div></div>
+      <div class="head-actions"><button class="btn pri">＋ 新建集合</button></div>
+    </div>
+
+    <div class="grid-cards">
+      <div class="col-card"><div class="row"><h3>OPC 模型库</h3><span class="tag-type t-model">model</span></div><div class="desc">光学 / 光刻胶 / 刻蚀 OPC 模型数据</div><div class="meta"><span>8,120 项</span><span>·</span><span>标签 26</span><span>·</span><span>脚本 ✓</span><span>·</span><span>管理员</span></div></div>
+      <div class="col-card"><div class="row"><h3>版图设计库</h3><span class="tag-type t-layout">layout</span></div><div class="desc">GDS / OASIS / DEF 版图数据</div><div class="meta"><span>6,040 项</span><span>·</span><span>标签 12</span><span>·</span><span>脚本 ✓</span><span>·</span><span>管理员</span></div></div>
+      <div class="col-card"><div class="row"><h3>图层库</h3><span class="tag-type t-layer">layer</span></div><div class="desc">版图图层子项（parent_child）</div><div class="meta"><span>9,300 项</span><span>·</span><span>标签 15</span><span>·</span><span>脚本 ✓</span><span>·</span><span>管理员</span></div></div>
+      <div class="col-card"><div class="row"><h3>测试用例库</h3><span class="tag-type t-case">case</span></div><div class="desc">OPC 测试用例（引用 model/layout）</div><div class="meta"><span>2,840 项</span><span>·</span><span>标签 20</span><span>·</span><span>脚本 ✓</span><span>·</span><span>管理员</span></div></div>
+    </div>
+
+    <div class="pager"><span>共 12 个集合</span><button class="pg">‹</button><button class="pg active">1</button><button class="pg">2</button><button class="pg">›</button></div>
+
+    <!-- 新建集合弹窗样例 -->
+    <div class="mask" style="position:static;margin-top:16px;background:none;backdrop-filter:none;align-items:flex-start">
+      <div class="modal" style="width:100%">
+        <div class="modal-title">＋ 新建集合</div>
+        <label class="field"><span>集合名称</span><input class="input" placeholder="如：OPC 模型库"></label>
+        <label class="field"><span>描述</span><textarea class="input" placeholder="集合用途说明"></textarea></label>
+        <label class="field"><span>初始集合管理员</span><select class="input"><option>admin（系统管理员）</option><option>zzhang</option></select></label>
+        <div class="modal-foot"><button class="btn">取消</button><button class="btn pri">创建</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

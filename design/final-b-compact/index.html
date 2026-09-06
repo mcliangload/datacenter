@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据中心 · 方向 B 紧凑版 设计稿索引</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Inter",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg,#f4f6fa);color:#1a2233;padding:30px}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+  .sub{color:#5b6575;font-size:13px;margin-top:5px;max-width:760px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:22px}
+  .item{background:#fff;border:1px solid #e5e9f0;border-radius:9px;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.06)}
+  .item .ph{height:120px;background:linear-gradient(135deg,#eaf1ff,#f0f5ff);display:grid;place-items:center;color:#2563eb;font-weight:700;font-size:15px;border-bottom:1px solid #e5e9f0}
+  .item .bd{padding:12px 14px}
+  .item .bd b{font-size:13.5px}
+  .item .bd .d{color:#8a94a6;font-size:12px;margin-top:3px}
+  .item .bd a{display:inline-flex;margin-top:10px;font-size:12.5px;color:#2563eb;text-decoration:none}
+  .tip{margin-top:20px;color:#8a94a6;font-size:12.5px;line-height:1.8;border-top:1px solid #e5e9f0;padding-top:14px}
+  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:5px;background:#eaf1ff;color:#2563eb;font-weight:600;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+  <h1>数据中心系统 · 前端设计稿（方向 B · 明亮企业风 · 紧凑版）<span class="badge">FINAL</span></h1>
+  <div class="sub">基于你选定的「明亮企业风」，做了更紧凑的排版（8px 圆角、更小的圆角与间距、更密的表格与卡片）。以下为各页面 HTML 设计稿，均已内嵌同一套 <code>dc.css</code> 共享设计系统，可直接浏览、并便于后续接入 go:embed 前端。</div>
+
+  <div class="grid">
+    <div class="item"><div class="ph">登录</div><div class="bd"><b>登录页</b><div class="d">登录卡片 + 提示 + Toast</div><a href="login.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">仪表盘</div><div class="bd"><b>仪表盘 / 概览</b><div class="d">统计卡、DQL、最近集合</div><a href="dashboard.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">数据查询</div><div class="bd"><b>数据查询（DQL）</b><div class="d">DQL 控制台 + 结果表 + 删除弹窗</div><a href="query-dql.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">DQL 语法</div><div class="bd"><b>DQL 语法帮助</b><div class="d">语法结构 + 运算符 + 示例</div><a href="dql-help.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">集合管理</div><div class="bd"><b>集合管理（列表）</b><div class="d">集合卡片网格 + 新建弹窗</div><a href="collections.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">集合详情</div><div class="bd"><b>集合详情</b><div class="d">概览/标签/脚本/成员/删除策略</div><a href="collection-detail.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">数据项详情</div><div class="bd"><b>数据项详情</b><div class="d">标签、刮削历史、血缘、树视图</div><a href="item-detail.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">刮削管理</div><div class="bd"><b>刮削管理（任务）</b><div class="d">状态统计 + 任务列表 + 过滤</div><a href="scrape-tasks.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">权限管理</div><div class="bd"><b>权限管理（用户）</b><div class="d">用户列表 + 角色 + 创建弹窗</div><a href="users.html">打开 →</a></div></div>
+    <div class="item"><div class="ph">个人设置</div><div class="bd"><b>个人设置</b><div class="d">个人信息、改密、审计日志</div><a href="profile.html">打开 →</a></div></div>
+  </div>
+
+  <div class="tip">
+    <b>说明：</b>① 各页面是独立 HTML 设计稿（静态示意数据），共享同一份 <code>dc.css</code>，风格与交互一致。<br>
+    ② 已覆盖全部业务页面：登录、仪表盘、DQL 查询、DQL 语法、集合管理、集合详情、数据项详情（含血缘/树视图）、刮削管理、权限管理、个人设置。<br>
+    ③ 下一步接入建议：将 <code>dc.css</code> 替换现有 <code>style.css</code>，按这些设计稿重写 <code>views.js</code> 中各视图的模板与交互即可。需要我继续把某个页面接入现有 go:embed 代码 / 或补充移动端、主题变量说明，请告诉我。
+  </div>
+</body>
+</html>

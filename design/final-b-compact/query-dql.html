@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据查询 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link active"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">数据 / <b>数据查询</b></div>
+      <div class="search">⌕<input placeholder="搜索数据项 / 路径 / 标签"></div>
+    </div>
+
+    <div class="page-head">
+      <div><h1>数据查询</h1><div class="desc">跨集合查询数据项 · DQL（类 JQL/SQL）</div></div>
+      <div class="head-actions"><button class="btn">💡 查询示例</button><button class="btn pri">＋ 新增数据项</button></div>
+    </div>
+
+    <div class="dql">
+      <span class="k">DQL</span>
+      <code class="input">(name LIKE "opc" OR version = "1.0") AND age EXISTS true AND collection IN ("model", "layout")</code>
+      <button class="btn sm">历史</button><button class="btn pri run">查询</button>
+    </div>
+
+    <div class="examples">
+      <button class="ex-chip">collection = "光刻模型库" AND model_name = "demo-model"</button>
+      <button class="ex-chip">age >= 3 AND stage IN ("dev","test")</button>
+      <button class="ex-chip">parent = "数据项ID" AND stage = "test"</button>
+      <button class="ex-chip">ancestor = "数据项ID"</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>查询结果</h3><span class="sub">128 项</span>
+        <div class="actions"><div class="seg"><button class="active">列表</button><button>卡片</button></div><button class="btn sm">导出</button><button class="btn sm">排序</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>路径</th><th>集合</th><th>标签</th><th>血缘</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="mono">/opc/model/na_28nm_v3.opc</td><td><span class="tag-type t-model">model</span></td>
+              <td><span class="tag"><span class="k">node=</span>7</span><span class="tag"><span class="k">na=</span>1.35</span><span class="tag"><span class="k">acc=</span>0.9</span></td>
+              <td><span class="badge b-violet"><span class="dot"></span>被引用</span></td>
+              <td><span class="badge b-ok"><span class="dot"></span>已发布</span></td>
+              <td class="actions-cell"><button class="btn sm">详情</button><button class="btn sm">重刮</button><button class="btn sm danger">删除</button></td>
+            </tr>
+            <tr>
+              <td class="mono">/opc/layout/cell_a01.gds</td><td><span class="tag-type t-layout">layout</span></td>
+              <td><span class="tag"><span class="k">cell=</span>A01</span><span class="tag"><span class="k">层=</span>14</span></td>
+              <td><span class="badge b-violet"><span class="dot"></span>14 子项</span></td>
+              <td><span class="badge b-run"><span class="dot"></span>刮削中</span></td>
+              <td class="actions-cell"><button class="btn sm">详情</button><button class="btn sm">重刮</button><button class="btn sm danger">删除</button></td>
+            </tr>
+            <tr>
+              <td class="mono">/opc/layer/poly_v2.layer</td><td><span class="tag-type t-layer">layer</span></td>
+              <td><span class="tag"><span class="k">type=</span>OD</span><span class="tag"><span class="k">min=</span>22nm</span></td>
+              <td><span class="badge b-info"><span class="dot"></span>子项</span></td>
+              <td><span class="badge b-info"><span class="dot"></span>已审核</span></td>
+              <td class="actions-cell"><button class="btn sm">详情</button><button class="btn sm">重刮</button><button class="btn sm danger">删除</button></td>
+            </tr>
+            <tr>
+              <td class="mono">/opc/case/case_0184.case</td><td><span class="tag-type t-case">case</span></td>
+              <td><span class="tag"><span class="k">corner=</span>SS</span><span class="tag"><span class="k">epe=</span>3.2</span></td>
+              <td><span class="badge b-violet"><span class="dot"></span>引用 2</span></td>
+              <td><span class="badge b-err"><span class="dot"></span>失败</span></td>
+              <td class="actions-cell"><button class="btn sm">详情</button><button class="btn sm">重刮</button><button class="btn sm danger">删除</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager"><span>共 128 项</span><button class="pg">‹</button><button class="pg active">1</button><button class="pg">2</button><button class="pg">3</button><button class="pg">›</button></div>
+    </div>
+
+    <!-- 删除弹窗等样例 -->
+    <div class="mask" style="position:static;margin-top:16px;background:none;backdrop-filter:none;align-items:flex-start">
+      <div class="modal" style="width:100%">
+        <div class="modal-title">⚠ 策略化删除 <span class="badge b-err">会影响子节点/引用</span></div>
+        <div class="help" style="margin-bottom:12px">数据项位于 <code class="mono">/opc/layout/cell_a01.gds</code>，删除将影响：</div>
+        <div style="margin-bottom:8px"><span class="badge b-violet">14 个子项（parent_child）</span> <span class="badge b-info">2 个引用（reference）</span></div>
+        <label class="check"><input type="checkbox"> 级联删除子节点（cascade）</label>
+        <label class="check"><input type="checkbox" checked> 仅预览影响（dry_run）</label>
+        <div class="modal-foot"><button class="btn">取消</button><button class="btn danger">预览影响</button><button class="btn pri">确认删除</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toasts"></div>
+</body>
+</html>

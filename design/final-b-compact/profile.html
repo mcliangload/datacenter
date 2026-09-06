@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人设置 · 数据中心</title>
+<link rel="stylesheet" href="dc.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产治理</small></div></div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-link"><span class="ic">▦</span>仪表盘</div>
+      <div class="nav-link"><span class="ic">⌕</span>数据查询<span class="pill">DQL</span></div>
+      <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+      <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+      <div class="nav-sec">系统</div>
+      <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+      <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+      <div class="nav-link active"><span class="ic">⚙</span>个人设置</div>
+    </nav>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><div class="u-name">admin</div><div class="u-role">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><div class="crumb">系统 / <b>个人设置</b></div></div>
+    <div class="page-head">
+      <div><h1>个人设置</h1><div class="desc">个人信息与密码</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card"><div class="card-head"><h3>个人信息</h3></div>
+        <div class="card-body">
+          <div class="detail">
+            <div class="k">用户名</div><div class="v">admin</div>
+            <div class="k">角色</div><div class="v"><span class="badge b-info">全局管理员</span></div>
+            <div class="k">参与集合</div><div class="v">4 个</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card"><div class="card-head"><h3>修改密码</h3></div>
+        <div class="card-body">
+          <label class="field"><span>原密码</span><input class="input" type="password" placeholder="请输入原密码"></label>
+          <label class="field"><span>新密码</span><input class="input" type="password" placeholder="至少 8 位"></label>
+          <label class="field"><span>确认新密码</span><input class="input" type="password"></label>
+          <button class="btn pri">保存修改</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 审计日志样例（admin） -->
+    <div class="card"><div class="card-head"><h3>审计日志</h3><span class="sub">最近操作</span><div class="actions"><button class="btn sm">导出</button></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>时间</th><th>用户</th><th>动作</th><th>对象</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">10:02:11</td><td>admin</td><td><span class="badge b-info">item.scrape</span></td><td class="mono">/opc/layout/cell_a01.gds</td></tr>
+            <tr><td class="mono">09:58:40</td><td>admin</td><td><span class="badge b-violet">relation.create</span></td><td class="mono">cell_a01 → poly_v2</td></tr>
+            <tr><td class="mono">09:51:22</td><td>zzhang</td><td><span class="badge b-muted">member.grant</span></td><td class="mono">OPC 模型库</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

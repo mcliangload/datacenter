@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模板 B · 明亮企业风（Light SaaS）</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --panel:#ffffff; --line:#e6eaf1; --line-2:#eef1f6;
+    --text:#1a2233; --text-2:#5b6575; --text-3:#97a1b2;
+    --accent:#2563eb; --accent-soft:#eaf1ff; --ok:#16a34a; --ok-soft:#e7f6ec;
+    --warn:#d97706; --warn-soft:#fdf1e0; --err:#dc2626; --err-soft:#fdeaea;
+    --sans:"Inter",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+    --shadow-lg:0 8px 24px rgba(16,24,40,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{display:flex;min-height:100vh}
+  /* sidebar */
+  .side{width:230px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;padding:20px 16px}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 8px 22px}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px}
+  .brand b{font-size:15px} .brand small{display:block;color:var(--text-3);font-size:11px;margin-top:-1px}
+  .nav-link{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--text-2);font-weight:500;cursor:pointer;margin-bottom:2px;transition:.15s}
+  .nav-link:hover{background:var(--bg);color:var(--text)}
+  .nav-link.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .ic{width:18px;text-align:center}
+  .badge-ct{background:var(--accent-soft);color:var(--accent);font-size:10.5px;padding:1px 6px;border-radius:6px;margin-left:auto}
+  .side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px}
+  .user{display:flex;gap:10px;align-items:center;padding:6px 8px}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+  .ver{font-size:10.5px;color:var(--text-3);text-align:center;padding-top:8px}
+  /* main */
+  .main{flex:1;margin-left:230px;padding:26px 32px 60px;max-width:1200px}
+  .crumb{color:var(--text-3);font-size:13px;margin-bottom:4px} .crumb b{color:var(--text-2);font-weight:500}
+  .page-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+  .page-head h1{font-size:22px;font-weight:700;letter-spacing:-.2px}
+  .page-head p{color:var(--text-2);font-size:13.5px;margin-top:3px}
+  .head-actions{display:flex;gap:10px}
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--text-3)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff} .btn.pri:hover{background:#1d4ed8}
+  .btn.ghost{border:none;background:none;box-shadow:none;color:var(--text-2)} .btn.ghost:hover{color:var(--text)}
+  /* stat grid */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
+  .stat .lab{color:var(--text-3);font-size:13px} 
+  .stat .num{font-size:28px;font-weight:700;margin-top:6px;letter-spacing:-.5px}
+  .stat .delta{font-size:12px;margin-top:6px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3)}
+  .stat .delta .up{color:var(--ok)} .stat .delta .down{color:var(--err)}
+  .stat .ic-num{float:right;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;margin-top:2px}
+  /* panel/card */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+  .card-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line-2)}
+  .card-head h3{font-size:15px;font-weight:600}
+  .card-head .sub{color:var(--text-3);font-size:12.5px}
+  .card-head .actions{margin-left:auto;display:flex;gap:8px}
+  /* segmented */
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:3px}
+  .seg button{border:none;background:none;padding:5px 14px;font-size:12.5px;color:var(--text-2);cursor:pointer;border-radius:7px;font-family:inherit}
+  .seg button.active{background:var(--panel);color:var(--text);font-weight:600;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:12px 20px;color:var(--text-3);font-size:12px;font-weight:500;letter-spacing:.3px;background:var(--bg);border-bottom:1px solid var(--line)}
+  td{padding:13px 20px;border-bottom:1px solid var(--line-2);font-size:13.5px}
+  tbody tr{transition:.12s} tbody tr:hover{background:#fafbfe}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:"SF Mono",Consolas,monospace;font-size:12.5px;color:var(--text-2)}
+  /* badges */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:7px;font-size:12px;font-weight:500}
+  .b-ok{background:var(--ok-soft);color:var(--ok)} .b-run{background:var(--warn-soft);color:var(--warn)}
+  .b-err{background:var(--err-soft);color:var(--err)} .b-info{background:var(--accent-soft);color:var(--accent)}
+  .tag{display:inline-block;background:var(--bg);border:1px solid var(--line);color:var(--text-2);padding:2px 8px;border-radius:6px;font-size:12px;margin-right:6px}
+  /* dql */
+  .dql{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:22px;box-shadow:var(--shadow)}
+  .dql .k{font-family:Consolas,monospace;color:var(--accent);font-weight:600;font-size:12px;background:var(--accent-soft);padding:2px 8px;border-radius:6px}
+  .dql code{font-family:Consolas,monospace;font-size:13px}
+  .dql .run{margin-left:auto}
+  /* progress */
+  .bar-track{height:8px;background:var(--bg);border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),#60a5fa);border-radius:99px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="side">
+    <div class="brand"><div class="logo">DC</div><div><b>数据中心</b><small>数据资产 · 血缘 · 元数据</small></div></div>
+    <div class="nav-link active"><span class="ic">▦</span>仪表盘</div>
+    <div class="nav-link"><span class="ic">⌕</span>数据查询 <span class="badge-ct">DQL</span></div>
+    <div class="nav-link"><span class="ic">◈</span>集合管理</div>
+    <div class="nav-link"><span class="ic">⌲</span>刮削管理</div>
+    <div class="nav-link"><span class="ic">✦</span>DQL 语法</div>
+    <div class="nav-link"><span class="ic">◉</span>权限管理</div>
+    <div class="nav-link"><span class="ic">⚙</span>个人设置</div>
+    <div class="side-foot">
+      <div class="user"><div class="avatar">A</div><div><b style="font-size:13px">admin</b><div style="font-size:11px;color:var(--text-3)">系统管理员</div></div></div>
+      <div class="ver">v0.13</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="crumb">工作区 / <b>仪表盘</b></div>
+    <div class="page-head">
+      <div><h1>仪表盘</h1><p>数据资产概览与刮削运行状态</p></div>
+      <div class="head-actions"><button class="btn">⌕ 搜索</button><button class="btn pri">＋ 添加数据</button></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="ic-num" style="background:var(--accent-soft);color:var(--accent)">▦</div><div class="lab">集合</div><div class="num">12</div><div class="delta"><span class="up">▲ 3</span> 本周</div></div>
+      <div class="stat"><div class="ic-num" style="background:var(--accent-soft);color:var(--accent)">◇</div><div class="lab">数据项</div><div class="num">26,300</div><div class="delta"><span class="up">▲ 1,204</span></div></div>
+      <div class="stat"><div class="ic-num" style="background:var(--warn-soft);color:var(--warn)">⌲</div><div class="lab">刮削任务</div><div class="num">8,940</div><div class="delta">成功率 99.9%</div></div>
+      <div class="stat"><div class="ic-num" style="background:var(--ok-soft);color:var(--ok)">⛓</div><div class="lab">关联关系</div><div class="num">24,120</div><div class="delta">血缘完整</div></div>
+    </div>
+
+    <div class="dql"><span class="k">DQL</span><code>collection = "model" AND status = "released"</code><button class="btn pri run">运行</button></div>
+
+    <div class="card">
+      <div class="card-head"><h3>数据项</h3><span class="sub">最近更新</span>
+        <div class="actions"><div class="seg"><button class="active">列表</button><button>卡片</button></div><button class="btn">筛选</button><button class="btn">导出</button></div>
+      </div>
+      <table>
+        <thead><tr><th>路径</th><th>集合</th><th>标签</th><th>状态</th><th>刮削</th><th>更新</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">/opc/model/na_28nm_v3.opc</td><td>model</td><td><span class="tag">node=7</span><span class="tag">na=1.35</span></td><td><span class="badge b-ok">已发布</span></td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td><td class="mono">2m</td></tr>
+          <tr><td class="mono">/opc/layout/cell_a01.gds</td><td>layout</td><td><span class="tag">cell=A01</span><span class="tag">层=14</span></td><td><span class="badge b-run">刮削中</span></td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:46%"></div></div></td><td class="mono">18s</td></tr>
+          <tr><td class="mono">/opc/layer/poly_v2.layer</td><td>layer</td><td><span class="tag">type=OD</span><span class="tag">min=22nm</span></td><td><span class="badge b-info">已审核</span></td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td><td class="mono">1h</td></tr>
+          <tr><td class="mono">/opc/case/case_0184.case</td><td>case</td><td><span class="tag">corner=SS</span><span class="tag">epe=3.2</span></td><td><span class="badge b-err">失败</span></td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:18%;background:#dc2626"></div></div></td><td class="mono">3h</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body>
+</html>

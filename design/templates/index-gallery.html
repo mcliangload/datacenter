@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据中心 · 前端风格 Template 对比选型</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Inter",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0e0e12;color:#e6e8ef;padding:32px;font-size:14px;line-height:1.6}
+  .head{max-width:1400px;margin:0 auto 26px}
+  .head h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+  .head p{color:#9aa0b0;margin-top:6px;font-size:13.5px;max-width:760px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;max-width:1400px;margin:0 auto}
+  .tile{background:#17171d;border:1px solid #26262e;border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .tile.top{border-color:#5b5bf0}
+  .tile-head{padding:16px 18px;border-bottom:1px solid #26262e;background:#1b1b23}
+  .tile-head .tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:5px;background:#5b5bf0;color:#fff;font-weight:600;margin-bottom:8px}
+  .tile-head .tag.g2{background:#0ea56b}.tile-head .tag.g3{background:#f59e0b}.tile-head .tag.g4{background:#6b7280}
+  .tile-head h2{font-size:16px;font-weight:700}
+  .tile-head .meta{color:#9aa0b0;font-size:12.5px;margin-top:4px}
+  .frame-wrap{flex:1;position:relative}
+  iframe{width:100%;height:600px;border:none;background:#fff;display:block}
+  .tile-foot{padding:12px 18px;border-top:1px solid #26262e;display:flex;align-items:center;gap:10px}
+  .tile-foot .tagline{color:#9aa0b0;font-size:12.5px;flex:1}
+  .btn{display:inline-flex;padding:7px 14px;border-radius:8px;border:1px solid #ffffff33;background:transparent;color:#fff;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .btn.sel{background:#5b5bf0;border-color:#5b5bf0;font-weight:600}
+  .btn:hover{border-color:#5b5bf0}
+  .note{max-width:1400px;margin:26px auto 0;color:#9aa0b0;font-size:12.5px;border-top:1px solid #26262e;padding-top:16px;line-height:1.8}
+  .note b{color:#e6e8ef}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>数据中心系统 · 前端风格 Template 对比选型</h1>
+    <p>以下 4 套为「视觉方向」演示稿（同一数据的仪表盘 + 数据列表），用来让你确认整体风格基调。<b>选定方向后</b>，我会据此输出完整的 HTML 设计稿（登录、各页面、组件、响应式、主题变量）。</p>
+  </div>
+
+  <div class="grid">
+    <div class="tile top">
+      <div class="tile-head"><span class="tag">模板 A</span><h2>深空数据台 · Dark Console</h2><div class="meta">深色主题 / 高密度 / 等宽数字 / 监控感。面向 OPC/工程数据的「操作台」气质。</div></div>
+      <div class="frame-wrap"><iframe src="template-a-dark-console.html"></iframe></div>
+      <div class="tile-foot"><div class="tagline">适合：全天盯屏、信息密度高、工程/监控场景</div><button class="btn sel">选择此方向</button></div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-head"><span class="tag">模板 B</span><h2>明亮企业风 · Light SaaS</h2><div class="meta">白底浅灰 / 克制的蓝 / 圆角卡片 / 大量留白。现代 SaaS 产品观感（类 Linear/Jira Cloud）。</div></div>
+      <div class="frame-wrap"><iframe src="template-b-light-saas.html"></iframe></div>
+      <div class="tile-foot"><div class="tagline">适合：多数团队、商务友好、通用性最强</div><button class="btn">选择此方向</button></div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-head"><span class="tag">模板 C</span><h2>渐变玻璃风 · Gradient Glass</h2><div class="meta">浅底 + 渐变光效 + 毛玻璃卡片 + 彩色高亮。更现代、更「科技感」的升级版玻璃风。</div></div>
+      <div class="frame-wrap"><iframe src="template-c-gradient-glass.html"></iframe></div>
+      <div class="tile-foot"><div class="tagline">适合：想保留「玻璃质感」但更现代、更高级的团队</div><button class="btn">选择此方向</button></div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-head"><span class="tag">模板 D</span><h2>极简工程风 · Flat Minimal</h2><div class="meta">近单色 / 高对比 / 锐利边缘 / 信息密集。克制、专注、工程工具感（Unity/Linear 工具风）。</div></div>
+      <div class="frame-wrap"><iframe src="template-d-flat-minimal.html"></iframe></div>
+      <div class="tile-foot"><div class="tagline">适合：追求简洁、专业、数据为重、厌弃花哨的团队</div><button class="btn">选择此方向</button></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>说明与建议：</b>
+    ① 这 4 套刻意做成<b>截然不同</b>的基调，便于对比——请从<b>配色（深/浅）、密度（信息量）、质感（玻璃/渐变/扁平）、性格（监控/SaaS/科技/极简）</b>几方面挑一个你最认同的。<br>
+    ② 如果你喜欢某个方向但想微调（比如「要 B 的浅色，但左侧栏换成 C 的渐变」，或「要 D 的极简，但加强状态色」），告诉我，我会在此基础上生成最终设计稿。<br>
+    ③ 选定后，完整设计稿将覆盖全部页面（登录、仪表盘、DQL 查询、集合管理、集合详情、刮削管理、权限管理、个人设置、数据项详情/关联/血缘、弹窗、Toast、表格、表单、主题变量），并可直接接入现有 go:embed 前端代码。
+  </div>
+</body>
+</html>
